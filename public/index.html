@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SuperKagi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="sidebar-header">
+      <button class="icon-btn" title="Menu" aria-label="Menu" id="collapseSidebarBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+      </button>
+      <div class="brand">SuperKagi</div>
+    </div>
+    <div class="sidebar-search">
+      <div class="search-input">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="chat-search" placeholder="Search" />
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="chip w-full" onclick="newChat()" title="New Chat" aria-label="New Chat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        New Chat
+      </button>
+      <button class="chip w-full" onclick="showConfig()" title="Settings" aria-label="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v4"/><path d="M12 19v4"/><path d="M4.22 4.22l2.83 2.83"/><path d="M16.95 16.95l2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="M4.22 19.78l2.83-2.83"/><path d="M16.95 7.05l2.83-2.83"/></svg>
+        Config
+      </button>
+    </nav>
+    <h3 class="section-title">Chats</h3>
+    <ul class="chat-list" id="chat-list" role="list"></ul>
+  </aside>
+
+  <!-- Mobile sidebar backdrop -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn mobile-only" id="mobileMenuBtn" aria-label="Open Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+      </button>
+      <div class="top-space"></div>
+    </header>
+
+    <section class="chat-wrap">
+      <div class="hero" id="hero">
+        <h1 class="hero-title">SuperKagi</h1>
+        <div class="hero-input">
+          <div class="pill-input">
+            <button class="icon-btn" title="Attach" aria-label="Attach" onclick="openFilePicker()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49"/></svg>
+            </button>
+            <input class="input" id="input" placeholder="What do you want to know?" onkeydown="handleKey(event)" />
+            <div class="input-actions">
+              <button class="chip primary" onclick="sendMessage()">Send</button>
+            </div>
+          </div>
+          <div class="attach-list" id="hero-attachments"></div>
+        </div>
+        <div class="hero-actions">
+          <button class="chip toggle" id="hero-deepsearch" onclick="toggleDeepSearch()">DeepSearch</button>
+          <button class="chip" onclick="showConfig()">Config</button>
+        </div>
+      </div>
+
+      <div class="chat-area" id="chat-area" aria-live="polite" aria-relevant="additions"></div>
+    </section>
+
+    <footer class="composer">
+      <div class="composer-inner">
+        <button class="icon-btn" title="Attach" aria-label="Attach" onclick="openFilePicker()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49"/></svg>
+        </button>
+        <input class="input" id="composer-input" placeholder="Type a message…" onkeydown="handleComposerKey(event)" />
+        <div class="composer-actions">
+          <button class="chip toggle" id="composer-deepsearch" onclick="toggleDeepSearch()">DeepSearch</button>
+          <button class="chip primary" onclick="sendMessageFromComposer()">Send</button>
+        </div>
+      </div>
+      <div class="attach-list" id="composer-attachments"></div>
+    </footer>
+  </main>
+
+  <div class="modal" id="config-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings-card" role="document" onclick="event.stopPropagation()">
+      <header class="settings-header">
+        <h2 id="settings-title">Settings</h2>
+        <button class="icon-btn" aria-label="Close" onclick="closeConfig()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </header>
+      <div class="settings-body">
+        <aside class="settings-nav">
+          <button class="nav-item active"><span class="dot"></span> Settings</button>
+        </aside>
+        <section class="settings-main">
+          <div class="section">
+            <div class="section-title">Connections</div>
+
+            <div class="settings-row">
+              <div class="row-label">Provider</div>
+              <div class="row-content">
+                <div class="segmented" id="provider-seg">
+                  <button class="seg" data-value="local" onclick="setProvider('local')">Local</button>
+                  <button class="seg" data-value="openrouter" onclick="setProvider('openrouter')">OpenRouter</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="row-label">Model</div>
+              <div class="row-content"><input class="field" id="model" placeholder="e.g., openrouter/auto or anthropic/claude-3.5-sonnet" value="llama3" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" /></div>
+            </div>
+
+            <div class="settings-row only-openrouter">
+              <div class="row-label">API Key</div>
+              <div class="row-content">
+                <input class="field" id="api-key" placeholder="OpenRouter API Key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" />
+                <div class="row-helpers">
+                  <button class="mini-btn" onclick="toggleApiMask()" id="mask-toggle">Show</button>
+                  <button class="mini-btn" onclick="copyApiKey()">Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row only-local">
+              <div class="row-label">Local URL</div>
+              <div class="row-content"><input class="field" id="local-url" placeholder="http://localhost:11434/v1" value="http://localhost:11434/v1" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="url" /></div>
+            </div>
+
+            <div class="settings-row">
+              <div class="row-label">System Prompt</div>
+              <div class="row-content"><textarea class="field field-textarea" id="system-prompt" placeholder="Optional system instructions" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea></div>
+            </div>
+
+            <div id="config-status" class="config-status" aria-live="polite"></div>
+
+            <div class="settings-actions">
+              <button class="chip" onclick="resetToDefaults()" title="Reset settings to server defaults">Reset</button>
+              <button class="chip" onclick="testConnection()">Test Connection</button>
+              <div style="flex:1"></div>
+              <button class="chip" onclick="closeConfig()">Cancel</button>
+              <button class="chip primary" onclick="saveConfig()">Save</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <!-- Hidden file input for attachments -->
+  <input type="file" id="file-input" style="display:none" multiple accept="image/*,.txt,.md,.csv,.json,.log,.html,.htm,.pdf" />
+  <script>
+    // Close settings on overlay click or Escape
+    document.getElementById('config-modal').addEventListener('click', (e)=>{
+      if (e.target === e.currentTarget) closeConfig();
+    });
+    window.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape') closeConfig();
+    });
+  </script>
+
+  <script>
+    let currentChatId = localStorage.getItem('currentChatId') || Date.now().toString();
+    let chats = JSON.parse(localStorage.getItem('chats') || '{}');
+    let config = JSON.parse(localStorage.getItem('config') || '{}');
+    let attachments = [];
+
+    let serverDefaults = null;
+
+    async function getServerDefaults() {
+      try {
+        const res = await fetch('/api/config-defaults');
+        if (!res.ok) return null;
+        const json = await res.json();
+        serverDefaults = json;
+        return json;
+      } catch (_) { return null; }
+    }
+
+    function mergeEnvDefaults(env) {
+      const defaults = {
+        provider: env?.provider || 'local',
+        localUrl: env?.localUrl || 'http://host.docker.internal:11434/api/chat',
+        systemPrompt: env?.systemPrompt || '',
+        deepSearch: !!(env?.deepSearch),
+        models: {
+          local: env?.modelLocal || 'llama3',
+          openrouter: env?.modelOpenrouter || 'openrouter/auto'
+        }
+      };
+
+      if (!config || typeof config !== 'object') config = {};
+      if (!config.models || typeof config.models !== 'object') config.models = {};
+      const hadUserSet = Object.prototype.hasOwnProperty.call(config, 'userSet');
+      if (!config.userSet || typeof config.userSet !== 'object') config.userSet = {};
+      if (!config.userSet.models || typeof config.userSet.models !== 'object') config.userSet.models = {};
+      if (typeof config.userSet.apiKey === 'undefined') config.userSet.apiKey = !!config.apiKey;
+
+      if (hadUserSet) {
+        if (!config.userSet.provider && typeof config.provider !== 'undefined' && config.provider !== defaults.provider) {
+          config.userSet.provider = true;
+        }
+        if (!config.userSet.localUrl && typeof config.localUrl === 'string' && config.localUrl !== defaults.localUrl) {
+          config.userSet.localUrl = true;
+        }
+        if (!config.userSet.systemPrompt && typeof config.systemPrompt === 'string' && config.systemPrompt !== defaults.systemPrompt) {
+          config.userSet.systemPrompt = true;
+        }
+        if (!config.userSet.deepSearch && typeof config.deepSearch !== 'undefined' && !!config.deepSearch !== defaults.deepSearch) {
+          config.userSet.deepSearch = true;
+        }
+        if (!config.userSet.models.local && typeof config.models.local === 'string' && config.models.local !== defaults.models.local) {
+          config.userSet.models.local = true;
+        }
+        if (!config.userSet.models.openrouter && typeof config.models.openrouter === 'string' && config.models.openrouter !== defaults.models.openrouter) {
+          config.userSet.models.openrouter = true;
+        }
+      }
+
+      if (!config.userSet.provider) config.provider = defaults.provider;
+      if (!config.userSet.localUrl) config.localUrl = defaults.localUrl;
+      if (!config.userSet.systemPrompt) config.systemPrompt = defaults.systemPrompt;
+      if (!config.userSet.deepSearch) config.deepSearch = defaults.deepSearch;
+
+      if (!config.userSet.models.local) config.models.local = defaults.models.local;
+      if (!config.userSet.models.openrouter) config.models.openrouter = defaults.models.openrouter;
+
+      const providerKey = (config.provider === 'openrouter') ? 'openrouter' : 'local';
+      config.model = config.models[providerKey] || defaults.models[providerKey];
+
+      if (typeof config.apiKey === 'undefined') config.apiKey = '';
+    }
+
+    function loadConfig() {
+      // Normalize to provider-specific model map
+      if (!config.models) {
+        config.models = { local: config.model || 'llama3', openrouter: config.model || 'openrouter/auto' };
+      }
+      if (!config.userSet) config.userSet = { models: {} };
+      if (!config.userSet.models) config.userSet.models = {};
+      setProvider(config.provider || 'local', false);
+      const activeModel = (config.models?.[config.provider || 'local']) || config.model || 'llama3';
+      document.getElementById('model').value = activeModel;
+      const apiKeyInput = document.getElementById('api-key');
+      apiKeyInput.value = config.apiKey || '';
+      // If server has an API key set, hint via placeholder without revealing it
+      if (serverDefaults && serverDefaults.hasApiKey && !config.apiKey) {
+        apiKeyInput.placeholder = 'Using server default';
+      } else {
+        apiKeyInput.placeholder = '';
+      }
+      document.getElementById('local-url').value = config.localUrl || 'http://host.docker.internal:11434/api/chat';
+      document.getElementById('system-prompt').value = config.systemPrompt || '';
+      config.deepSearch = !!config.deepSearch;
+      refreshDeepSearchToggle();
+    }
+
+    async function resetToDefaults() {
+      if (!confirm('Reset all settings to server defaults?')) return;
+      try {
+        if (!serverDefaults) await getServerDefaults();
+        config = {};
+        localStorage.removeItem('config');
+        mergeEnvDefaults(serverDefaults || {});
+        localStorage.setItem('config', JSON.stringify(config));
+        loadConfig();
+        showStatus('Settings reset to defaults.', true);
+      } catch (e) {
+        showStatus('Failed to reset settings: ' + (e.message||e), false);
+      }
+    }
+
+    function saveConfig() {
+      const seg = document.querySelector('#provider-seg .seg.active');
+      const provider = seg ? seg.getAttribute('data-value') : 'local';
+      // ensure models map exists
+      if (!config.models) config.models = { local: 'llama3', openrouter: 'openrouter/auto' };
+      const enteredModel = document.getElementById('model').value;
+      config.models[provider] = enteredModel;
+      config.provider = provider;
+      config.model = enteredModel; // keep legacy field for compatibility
+      config.apiKey = document.getElementById('api-key').value;
+      config.localUrl = document.getElementById('local-url').value;
+      config.systemPrompt = document.getElementById('system-prompt').value;
+      config.deepSearch = !!config.deepSearch;
+
+      if (!config.userSet || typeof config.userSet !== 'object') config.userSet = {};
+      if (!config.userSet.models || typeof config.userSet.models !== 'object') config.userSet.models = {};
+
+      const providerDefault = (serverDefaults && serverDefaults.provider) || 'local';
+      const localModelDefault = (serverDefaults && serverDefaults.modelLocal) || 'llama3';
+      const openrouterModelDefault = (serverDefaults && serverDefaults.modelOpenrouter) || 'openrouter/auto';
+      const localUrlDefault = (serverDefaults && serverDefaults.localUrl) || 'http://host.docker.internal:11434/api/chat';
+      const systemPromptDefault = serverDefaults ? (serverDefaults.systemPrompt || '') : '';
+      const deepSearchDefault = !!(serverDefaults && serverDefaults.deepSearch);
+
+      config.userSet.provider = config.provider !== providerDefault;
+      config.userSet.models.local = (config.models.local || '') !== localModelDefault;
+      config.userSet.models.openrouter = (config.models.openrouter || '') !== openrouterModelDefault;
+      config.userSet.localUrl = (config.localUrl || '') !== localUrlDefault;
+      config.userSet.systemPrompt = (config.systemPrompt || '') !== systemPromptDefault;
+      config.userSet.deepSearch = (!!config.deepSearch) !== deepSearchDefault;
+      config.userSet.apiKey = !!config.apiKey;
+
+      localStorage.setItem('config', JSON.stringify(config));
+      closeConfig();
+    }
+
+    function showConfig() {
+      loadConfig();
+      document.getElementById('config-modal').style.display = 'flex';
+      document.body.classList.add('modal-open');
+    }
+
+    function closeConfig() {
+      document.getElementById('config-modal').style.display = 'none';
+      document.body.classList.remove('modal-open');
+    }
+
+    function setProvider(value, persistCurrent = true) {
+      const seg = document.getElementById('provider-seg');
+      seg.querySelectorAll('.seg').forEach(btn => {
+        if (btn.getAttribute('data-value') === value) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+      document.querySelectorAll('.only-openrouter').forEach(el => el.style.display = value === 'openrouter' ? 'grid' : 'none');
+      document.querySelectorAll('.only-local').forEach(el => el.style.display = value === 'local' ? 'grid' : 'none');
+      if (!config.models) config.models = { local: 'llama3', openrouter: 'openrouter/auto' };
+      if (!config.userSet) config.userSet = { models: {} };
+      if (!config.userSet.models) config.userSet.models = {};
+      // persist current field into previous provider slot
+      const prev = config.provider || 'local';
+      const modelInput = document.getElementById('model');
+      if (modelInput && prev && persistCurrent && prev !== value) {
+        config.models[prev] = modelInput.value;
+        if (config.userSet && config.userSet.models) {
+          const defaults = {
+            local: (serverDefaults && serverDefaults.modelLocal) || 'llama3',
+            openrouter: (serverDefaults && serverDefaults.modelOpenrouter) || 'openrouter/auto'
+          };
+          config.userSet.models[prev] = (config.models[prev] || '') !== defaults[prev];
+        }
+      }
+      config.provider = value;
+      const m = config.models[value] || '';
+      if (modelInput) modelInput.value = m;
+      config.model = m || config.model;
+    }
+
+    function toggleApiMask() {
+      const input = document.getElementById('api-key');
+      const btn = document.getElementById('mask-toggle');
+      if (input.type === 'password') { input.type = 'text'; btn.textContent = 'Hide'; }
+      else { input.type = 'password'; btn.textContent = 'Show'; }
+    }
+
+    async function copyApiKey() {
+      const v = document.getElementById('api-key').value;
+      try { await navigator.clipboard.writeText(v); showStatus('Copied API key to clipboard.', true); }
+      catch { showStatus('Unable to copy.', false); }
+    }
+
+    async function testConnection() {
+      const seg = document.querySelector('#provider-seg .seg.active');
+      const provider = seg ? seg.getAttribute('data-value') : 'local';
+      const payload = {
+        provider,
+        apiKey: document.getElementById('api-key').value,
+        localUrl: document.getElementById('local-url').value,
+      };
+      showStatus('Testing…');
+      try {
+        const res = await fetch('/api/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        const ok = !!(data.provider?.ok) && !!(data.mcp?.ok);
+        const details = `Provider: ${data.provider?.ok ? 'OK' : 'Fail'} • MCP: ${data.mcp?.ok ? 'OK' : 'Fail'}`;
+        showStatus(details, ok);
+      } catch (e) {
+        showStatus('Test failed: ' + (e.message || e), false);
+      }
+    }
+
+    function showStatus(msg, ok) {
+      const el = document.getElementById('config-status');
+      el.textContent = msg || '';
+      el.classList.remove('ok', 'err');
+      if (ok === true) el.classList.add('ok');
+      else if (ok === false) el.classList.add('err');
+    }
+
+    function loadChatList() {
+      const list = document.getElementById('chat-list');
+      list.innerHTML = '';
+      const q = (document.getElementById('chat-search')?.value || '').toLowerCase();
+      Object.keys(chats).sort().reverse().forEach(id => {
+        const last = (chats[id] || []).slice().reverse().find(m => m.role === 'user');
+        let labelText = '';
+        if (Array.isArray(last?.content)) {
+          labelText = last.content.map(p => p.text || (p.image_url ? '[image]' : '')).join(' ').trim();
+        } else {
+          labelText = last?.content || '';
+        }
+        const label = (labelText || `Chat ${id.slice(-4)}`).slice(0,40);
+        if (q && !label.toLowerCase().includes(q)) return;
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <div class="chat-item ${id===currentChatId?'active':''}" title="${label.replace(/\"/g,'&quot;')}">
+            <div>
+              <span class="chat-title">${label}</span>
+              <span class="chat-meta">${new Date(parseInt(id,10)).toLocaleDateString()}</span>
+            </div>
+            <button class="mini-btn" title="Delete" onclick="deleteChat('${id}'); event.stopPropagation();">Delete</button>
+          </div>`;
+        li.onclick = () => switchChat(id);
+        list.appendChild(li);
+      });
+    }
+
+    function switchChat(id) {
+      currentChatId = id;
+      localStorage.setItem('currentChatId', id);
+      renderChat();
+      loadChatList();
+    }
+
+    function newChat() {
+      // If an empty chat exists, reuse it and move it to top by rekeying
+      const emptyIds = Object.keys(chats).filter(id => (chats[id]||[]).length === 0);
+      if (emptyIds.length) {
+        const oldId = emptyIds.sort().reverse()[0];
+        const newId = Date.now().toString();
+        chats[newId] = chats[oldId];
+        delete chats[oldId];
+        currentChatId = newId;
+      } else {
+        currentChatId = Date.now().toString();
+        chats[currentChatId] = [];
+      }
+      localStorage.setItem('currentChatId', currentChatId);
+      saveChats();
+      renderChat();
+      loadChatList();
+    }
+
+    function deleteChat(id) {
+      if (!chats[id]) return;
+      if (!confirm('Delete this chat?')) return;
+      delete chats[id];
+      if (currentChatId === id) {
+        const ids = Object.keys(chats).sort().reverse();
+        currentChatId = ids[0] || Date.now().toString();
+        if (!chats[currentChatId]) chats[currentChatId] = [];
+        localStorage.setItem('currentChatId', currentChatId);
+      }
+      saveChats();
+      loadChatList();
+      renderChat();
+    }
+
+    function saveChats() {
+      localStorage.setItem('chats', JSON.stringify(chats));
+    }
+
+    function renderChat() {
+      const area = document.getElementById('chat-area');
+      const hero = document.getElementById('hero');
+      const composer = document.querySelector('.composer');
+      area.innerHTML = '';
+      const thread = chats[currentChatId] || [];
+      const isEmpty = thread.length === 0;
+      hero.style.display = isEmpty ? 'flex' : 'none';
+      if (composer) composer.style.display = isEmpty ? 'none' : 'grid';
+      thread.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.role}`;
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${msg.role} ${msg.pending ? 'typing' : ''}`;
+        if (msg.pending) {
+          bubble.innerHTML = '<span class="typing-dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+        } else {
+          if (Array.isArray(msg.content)) {
+            let html = '';
+            msg.content.forEach(part => {
+              if (part.type === 'text' || part.text) {
+                html += renderMD(part.text || '');
+              } else if (part.type === 'image_url' && part.image_url?.url) {
+                html += `<img src="${part.image_url.url}" alt="image" />`;
+              }
+            });
+            bubble.innerHTML = html || '';
+          } else {
+            bubble.innerHTML = renderMD(msg.content || '');
+          }
+        }
+        div.appendChild(bubble);
+        area.appendChild(div);
+      });
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function getActiveInput() {
+      const composer = document.querySelector('.composer');
+      const heroInput = document.getElementById('input');
+      const compInput = document.getElementById('composer-input');
+      const useComposer = composer && getComputedStyle(composer).display !== 'none';
+      return useComposer ? compInput : heroInput;
+    }
+
+    async function sendMessage() {
+      const heroInput = document.getElementById('input');
+      const compInput = document.getElementById('composer-input');
+      const active = getActiveInput();
+      let message = active.value.trim();
+      // If DeepSearch is on, coerce prompt to the pattern that triggers web search
+      if (config.deepSearch) {
+        const lower = message.toLowerCase();
+        if (!lower.startsWith('search for:') && !lower.startsWith('search:')) {
+          // If no text but attachments exist, provide a generic target
+          if (!message && attachments.length > 0) message = 'Search for: information related to the attached files';
+          else message = 'Search for: ' + message;
+        }
+      }
+      if (!message) return;
+      heroInput.value = '';
+      compInput.value = '';
+
+      if (!chats[currentChatId]) chats[currentChatId] = [];
+      const userContent = buildUserContentParts(message);
+      chats[currentChatId].push({ role: 'user', content: userContent });
+      // reset attachments after adding
+      attachments = [];
+      renderAttachmentsPreviews();
+      saveChats();
+      renderChat();
+
+      // Add a transient typing placeholder
+      const pending = { role: 'assistant', content: '', pending: true };
+      chats[currentChatId].push(pending);
+      saveChats();
+      renderChat();
+
+      const messagesToSend = (chats[currentChatId] || []).filter(m => !m.pending);
+
+      const activeModel = (config.models?.[config.provider] || config.model || 'llama3');
+      const systemPromptExtra = config.deepSearch ? '\nUse web search/browsing MCP tools to gather and verify up-to-date information. Prefer calling tools to fetch pages; summarize with concise bullet points and include source names.' : '';
+      await streamAssistantResponse(messagesToSend, activeModel, systemPromptExtra);
+    }
+
+    async function streamAssistantResponse(messagesToSend, activeModel, systemPromptExtra) {
+      const payload = {
+        messages: messagesToSend,
+        provider: config.provider,
+        model: activeModel,
+        apiKey: config.apiKey,
+        localUrl: config.localUrl,
+        systemPrompt: (config.systemPrompt || '') + systemPromptExtra
+      };
+
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok || !res.body) {
+        // Fallback to non-stream path
+        const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const { content } = await r.json();
+        const thread = chats[currentChatId];
+        for (let i = thread.length - 1; i >= 0; i--) {
+          const m = thread[i];
+          if (m && m.role === 'assistant' && m.pending) { thread[i] = { role: 'assistant', content }; break; }
+        }
+        saveChats();
+        renderChat();
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let assembled = '';
+      let lastRender = 0;
+      // Keep updating the same pending bubble across tool-call cycles
+      const updateBubble = (finalize = false) => {
+        const now = Date.now();
+        if (!finalize && (now - lastRender) < 60) return; // throttle
+        const thread = chats[currentChatId];
+        let updated = false;
+        for (let i = thread.length - 1; i >= 0; i--) {
+          const m = thread[i];
+          if (m && m.role === 'assistant') {
+            const pending = m.pending === true && !finalize;
+            thread[i] = { role: 'assistant', content: assembled, ...(pending ? { pending: true } : {}) };
+            updated = true;
+            break;
+          }
+        }
+        if (!updated) {
+          thread.push({ role: 'assistant', content: assembled, ...(finalize ? {} : { pending: true }) });
+        }
+        saveChats();
+        renderChat();
+        lastRender = now;
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const chunk = buffer.slice(0, idx); buffer = buffer.slice(idx + 2);
+          const line = chunk.split('\n').find(l => l.startsWith('data: '));
+          if (!line) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') { break; }
+          try {
+            const data = JSON.parse(payload);
+            if (data && typeof data.content === 'string') {
+              assembled += data.content;
+              updateBubble(false);
+            }
+          } catch {}
+        }
+      }
+      updateBubble(true);
+    }
+
+    function handleKey(event) {
+      if (event.key === 'Enter') sendMessage();
+    }
+
+    function sendMessageFromComposer() { sendMessage(); }
+
+    function handleComposerKey(event) {
+      if (event.key === 'Enter') sendMessageFromComposer();
+    }
+
+    function deepSearch() { // backward compat alias
+      toggleDeepSearch();
+    }
+
+    function toggleDeepSearch() {
+      config.deepSearch = !config.deepSearch;
+      if (!config.userSet) config.userSet = {};
+      const deepSearchDefault = !!(serverDefaults && serverDefaults.deepSearch);
+      config.userSet.deepSearch = (!!config.deepSearch) !== deepSearchDefault;
+      refreshDeepSearchToggle();
+      localStorage.setItem('config', JSON.stringify(config));
+    }
+
+    function refreshDeepSearchToggle() {
+      const on = !!config.deepSearch;
+      const hero = document.getElementById('hero-deepsearch');
+      const comp = document.getElementById('composer-deepsearch');
+      [hero, comp].forEach(b => { if (b) b.classList.toggle('active', on); });
+    }
+
+    function focusActiveInput() {
+      const el = getActiveInput();
+      el?.focus();
+    }
+
+    // Minimal markdown rendering (safe, escaped)
+    function renderMarkdown(text) {
+      const esc = (s) => s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Code blocks ```lang\n...```
+      let html = '';
+      const parts = (text + '\n').split(/```/);
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+          // normal text: inline code and bold
+          const p = parts[i]
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+?)`/g, '<code>$1</code>');
+          html += esc(p).replace(/\n/g, '<br/>');
+        } else {
+          // code block: optional language on first line
+          const seg = parts[i];
+          const nl = seg.indexOf('\n');
+          const lang = nl === -1 ? '' : esc(seg.slice(0, nl).trim());
+          const code = nl === -1 ? seg : seg.slice(nl + 1);
+          html += `<pre><code class="lang-${lang}">${esc(code)}</code></pre>`;
+        }
+      }
+      return html;
+    }
+
+    // Sidebar toggle for mobile
+    function toggleSidebar(force) {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (!sidebar || !overlay) return;
+      const open = (typeof force === 'boolean') ? force : !sidebar.classList.contains('open');
+      if (open) {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+        document.body.classList.add('no-scroll');
+      } else {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.classList.remove('no-scroll');
+      }
+    }
+
+    // Desktop collapse toggle
+    function isMobileView() {
+      return window.matchMedia('(max-width: 780px)').matches;
+    }
+
+    function toggleSidebarCollapsed(force) {
+      const body = document.body;
+      const shouldCollapse = (typeof force === 'boolean') ? force : !body.classList.contains('sidebar-collapsed');
+      // Only meaningful on desktop widths; on mobile we use the overlay menu instead
+      if (isMobileView()) {
+        body.classList.remove('sidebar-collapsed');
+        return;
+      }
+      body.classList.toggle('sidebar-collapsed', shouldCollapse);
+      try { localStorage.setItem('sidebarCollapsed', shouldCollapse ? '1' : '0'); } catch (_) {}
+    }
+
+    (document.getElementById('mobileMenuBtn')||{}).onclick = () => toggleSidebar();
+    (document.getElementById('collapseSidebarBtn')||{}).onclick = () => {
+      if (isMobileView()) toggleSidebar();
+      else toggleSidebarCollapsed();
+    };
+    (document.getElementById('sidebar-overlay')||{}).onclick = () => toggleSidebar(false);
+
+    // Safer markdown renderer: headings, lists, links, tables, code, bold, inline code
+    function renderMD(text) {
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      function renderInline(segment) {
+        // Build with proper escaping but keep <a> tags intact
+        const linkRE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+        let out = '';
+        let last = 0; let m;
+        while ((m = linkRE.exec(segment)) !== null) {
+          out += esc(segment.slice(last, m.index));
+          const t = esc(m[1]);
+          const u = esc(m[2]);
+          out += `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`;
+          last = m.index + m[0].length;
+        }
+        out += esc(segment.slice(last));
+        // Bold and inline code
+        out = out
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+?)`/g, '<code>$1</code>');
+        // Allow explicit line breaks inserted by models
+        out = out.replace(/&lt;br\/?&gt;/g, '<br/>');
+        return out;
+      }
+
+      function renderBlock(blockText) {
+        const lines = blockText.replace(/\r\n/g, '\n').split('\n');
+        let html = '';
+        let inList = false;
+        const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+
+        function splitCells(line) {
+          const trimmed = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '');
+          return trimmed.split('|');
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const raw = lines[i];
+          const line = raw.trimEnd();
+          if (!line.trim()) { // blank line
+            closeList();
+            continue;
+          }
+          // Table detection: header row starting with '|' and a separator on next line
+          if (line.startsWith('|')) {
+            const next = (lines[i+1] || '').trim();
+            if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next)) {
+              const headers = splitCells(line);
+              i++; // skip separator
+              closeList();
+              html += '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
+              headers.forEach(h => { html += `<th>${renderInline(h.trim())}</th>`; });
+              html += '</tr></thead><tbody>';
+              while (i+1 < lines.length && lines[i+1].trim().startsWith('|')) {
+                i++;
+                const cells = splitCells(lines[i].trim());
+                html += '<tr>';
+                for (let c = 0; c < headers.length; c++) {
+                  html += `<td>${renderInline((cells[c] || '').trim())}</td>`;
+                }
+                html += '</tr>';
+              }
+              html += '</tbody></table></div>';
+              continue;
+            }
+          }
+          const h = line.match(/^#{1,6}\s+(.*)$/);
+          if (h) {
+            closeList();
+            const level = Math.min(6, line.indexOf(' '));
+            html += `<h${level}>${renderInline(h[1])}</h${level}>`;
+            continue;
+          }
+          const li = line.match(/^[-*]\s+(.*)$/);
+          if (li) {
+            if (!inList) { html += '<ul>'; inList = true; }
+            html += `<li>${renderInline(li[1])}</li>`;
+            continue;
+          }
+          closeList();
+          html += `<p>${renderInline(line)}</p>`;
+        }
+        closeList();
+        return html;
+      }
+
+      let html = '';
+      const parts = (text || '').split(/```/);
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+          html += renderBlock(parts[i]);
+        } else {
+          const seg = parts[i];
+          const nl = seg.indexOf('\n');
+          const lang = nl === -1 ? '' : seg.slice(0, nl).trim();
+          const code = nl === -1 ? seg : seg.slice(nl + 1);
+          html += `<pre><code class="lang-${esc(lang)}">${esc(code)}</code></pre>`;
+        }
+      }
+      return html;
+    }
+
+    // Initial load
+    (async function init() {
+      const env = await getServerDefaults();
+      mergeEnvDefaults(env);
+      if (!chats[currentChatId]) newChat();
+      loadChatList();
+      renderChat();
+      refreshDeepSearchToggle();
+      document.getElementById('chat-search').addEventListener('input', loadChatList);
+      if (!config.provider) showConfig();
+    })();
+
+    // Apply persisted desktop sidebar collapsed state and keep it in sync on resize
+    (function initSidebarCollapsedPref() {
+      const pref = (localStorage.getItem('sidebarCollapsed') === '1');
+      if (pref && !isMobileView()) document.body.classList.add('sidebar-collapsed');
+      window.addEventListener('resize', () => {
+        if (isMobileView()) {
+          document.body.classList.remove('sidebar-collapsed');
+        } else {
+          const p = (localStorage.getItem('sidebarCollapsed') === '1');
+          document.body.classList.toggle('sidebar-collapsed', p);
+        }
+      });
+    })();
+
+    // Attachments: picker and processing
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      for (const f of files) {
+        const att = await readAttachment(f);
+        if (att) attachments.push(att);
+      }
+      renderAttachmentsPreviews();
+      e.target.value = '';
+    });
+
+    // Drag & drop support
+    document.addEventListener('dragover', (e) => { e.preventDefault(); });
+    document.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer?.files || []);
+      if (!files.length) return;
+      for (const f of files) {
+        const att = await readAttachment(f);
+        if (att) attachments.push(att);
+      }
+      renderAttachmentsPreviews();
+    });
+
+    // Paste support
+    // - If files/images on clipboard: attach them (and prevent default)
+    // - If plain text and user is typing in the chat input: let the input handle it (no attachment)
+    // - If plain text and focus is elsewhere: create a text attachment
+    document.addEventListener('paste', async (e) => {
+      const files = Array.from(e.clipboardData?.files || []);
+      const active = document.activeElement; // HTMLElement or null
+      const activeId = (active && (active).id) || '';
+      const activeTag = (active && (active).tagName) || '';
+      const isChatInput = !!active && (
+        activeId === 'input' || activeId === 'composer-input' ||
+        activeTag === 'INPUT' || activeTag === 'TEXTAREA'
+      );
+
+      if (files.length > 0) {
+        e.preventDefault();
+        let added = false;
+        for (const f of files) {
+          const att = await readAttachment(f);
+          if (att) { attachments.push(att); added = true; }
+        }
+        if (added) renderAttachmentsPreviews();
+        return;
+      }
+
+      const text = e.clipboardData?.getData('text');
+      if (text && text.trim()) {
+        if (isChatInput) {
+          // Let the input handle normal text paste; do not add a duplicate attachment
+          return;
+        }
+        attachments.push({ kind: 'text', name: 'pasted.txt', text });
+        renderAttachmentsPreviews();
+      }
+    });
+
+    function openFilePicker() {
+      document.getElementById('file-input').click();
+    }
+
+    function extOf(name) { const m = name.match(/\.([^.]+)$/); return m ? m[1].toLowerCase() : ''; }
+
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read error'));
+        reader.onload = () => resolve(reader.result);
+        return reader;
+      });
+    }
+
+    function readAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result); r.readAsDataURL(file); }); }
+    function readAsText(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result); r.readAsText(file); }); }
+
+    const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB soft cap for data URLs
+
+    async function optimizeImage(dataUrl, maxDim = 1600, quality = 0.85) {
+      try {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = dataUrl;
+        await img.decode();
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        // Prefer jpeg to shrink size
+        const out = canvas.toDataURL('image/jpeg', quality);
+        return out && out.length < dataUrl.length ? out : dataUrl;
+      } catch { return dataUrl; }
+    }
+
+    async function readAttachment(file) {
+      const name = file.name;
+      const type = (file.type || '').toLowerCase();
+      const ext = extOf(name);
+      try {
+        if (type.startsWith('image/') || ['png','jpg','jpeg','gif','webp'].includes(ext)) {
+          let url = await readAsDataURL(file);
+          url = await optimizeImage(url, 1600, 0.85);
+          if (url.length > MAX_UPLOAD_BYTES) url = await optimizeImage(url, 1200, 0.8);
+          if (url.length > MAX_UPLOAD_BYTES) url = await optimizeImage(url, 900, 0.75);
+          if (url.length > MAX_UPLOAD_BYTES) {
+            return { kind: 'note', name, text: `[Image too large to attach: ${name}]` };
+          }
+          return { kind: 'image', name, url };
+        }
+        if (['txt','md','csv','json','log','html','htm'].includes(ext) || type.startsWith('text/')) {
+          let text = await readAsText(file);
+          text = String(text || '').slice(0, 20000);
+          return { kind: 'text', name, text };
+        }
+        if (ext === 'pdf' || type === 'application/pdf') {
+          // fallback: include marker only
+          return { kind: 'note', name, text: `[Attached PDF: ${name}]` };
+        }
+      } catch (e) {}
+      return { kind: 'note', name, text: `[Attached file: ${name}]` };
+    }
+
+    function renderAttachmentsPreviews() {
+      const hostIds = ['hero-attachments','composer-attachments'];
+      hostIds.forEach(id => {
+        const host = document.getElementById(id);
+        if (!host) return;
+        host.innerHTML = '';
+        attachments.forEach((a, idx) => {
+          const chip = document.createElement('span');
+          chip.className = 'attach-chip';
+          const ext = a.kind === 'image' ? 'image' : (extOf(a.name) || a.kind);
+          chip.innerHTML = `<span class="ext">${ext}</span> ${a.name} <button title="Remove" onclick="removeAttachment(${idx})">×</button>`;
+          host.appendChild(chip);
+        });
+      });
+    }
+
+    function removeAttachment(i) {
+      attachments.splice(i,1);
+      renderAttachmentsPreviews();
+    }
+
+    function buildUserContentParts(text) {
+      const parts = [];
+      if (text && text.trim()) parts.push({ type: 'text', text });
+      const provider = config.provider || 'local';
+      for (const a of attachments) {
+        if (a.kind === 'image') {
+          if (provider === 'openrouter') parts.push({ type: 'image_url', image_url: { url: a.url } });
+          else parts.push({ type: 'text', text: `[Image attached: ${a.name}]` });
+        } else if (a.kind === 'text') {
+          parts.push({ type: 'text', text: `File ${a.name}:\n${a.text}` });
+        } else if (a.kind === 'note') {
+          parts.push({ type: 'text', text: a.text });
+        }
+      }
+      if (parts.length === 1 && parts[0].type === 'text') return parts[0].text; // keep simple
+      return parts;
+    }
+  </script>
+</body>
+</html>
