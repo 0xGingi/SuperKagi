@@ -1,13 +1,23 @@
 # SuperKagi
 
-A selfhosted frontend to use local LLMs or openrouter with the kagi search MCP:
+A grok-inspired chat UI for local LLMs or OpenRouter with Kagi Web Search via MCP.
 
-- A local OpenAI-compatible LLM server (e.g., Ollama / LM Studio)
+- Local OpenAI-compatible LLM server (e.g., Ollama / LM Studio)
 - OpenRouter
-- Kagi Web Search via MCP (Model Context Protocol) so the model can search, browse, and summarize the web during a chat.
-- Grok-Inspired UI
+- NanoGPT (OpenAI-compatible)
+- Kagi Web Search via MCP (Model Context Protocol) so the model can search, browse, and summarize the web during a chat
 
-## Setup via Docker Compose
-- Copy the ```.example.env``` as ```.env``` and set the variables
-- start the container: ```docker compose up -d --build```
-- Runs on port 3545
+## Prereqs
+- Bun (package manager + runtime)
+- uv (installed automatically in the container) for the `kagimcp` tool
+
+## Running locally
+```bash
+bun install
+bun run dev
+```
+
+## Docker
+```bash
+docker compose up -d --build
+```

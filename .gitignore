@@ -1,2 +1,9 @@
 .env
+.env.local
+.next
+.turbo
 node_modules/
+out
+npm-debug.log*
+.vercel
+package-lock.json

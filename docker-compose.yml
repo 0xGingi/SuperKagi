@@ -2,6 +2,9 @@ services:
   app:
     build: .
     ports:
-      - '3545:3545'
+      - '3545:3000'
     env_file:
       - .env
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
