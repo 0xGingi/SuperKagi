@@ -4,6 +4,7 @@ A grok-inspired chat UI for local LLMs or OpenRouter with Kagi Web Search via MC
 
 - Local OpenAI-compatible LLM server (e.g., Ollama / LM Studio)
 - OpenRouter
+- Nano-gpt.com
 - Kagi Web Search via MCP (Model Context Protocol) so the model can search, browse, and summarize the web during a chat.
 - Grok-Inspired UI
 
