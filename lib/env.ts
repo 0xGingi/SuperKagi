@@ -7,6 +7,7 @@ const envSchema = z.object({
   MODEL_LOCAL: z.string().optional(),
   MODEL_OPENROUTER: z.string().optional(),
   MODEL_NANOGPT: z.string().optional(),
+  IMAGE_MODEL_NANOGPT: z.string().optional(),
   LOCAL_URL: z.string().optional(),
   SYSTEM_PROMPT: z.string().optional(),
   DEEP_SEARCH: z.string().optional(),
@@ -36,6 +37,7 @@ const deepSearch = parsed.DEEP_SEARCH
 const openrouterApiKey = parsed.OPENROUTER_API_KEY || "";
 const nanogptApiKey = parsed.NANOGPT_API_KEY || "";
 const nanogptBaseUrl = parsed.NANOGPT_BASE_URL || "https://nano-gpt.com/v1";
+const imageModelNanogpt = parsed.IMAGE_MODEL_NANOGPT || "chroma";
 const kagiApiKey = parsed.KAGI_API_KEY || "";
 const kagiEngine = parsed.KAGI_SUMMARIZER_ENGINE || "cecil";
 const appOrigin = parsed.APP_ORIGIN || "http://localhost:3545";
@@ -45,6 +47,7 @@ export const serverDefaults = {
   modelLocal,
   modelOpenrouter,
   modelNanogpt,
+  imageModelNanogpt,
   hasApiKey: !!openrouterApiKey,
   hasNanoApiKey: !!nanogptApiKey,
   localUrl,
@@ -57,6 +60,7 @@ export const env = {
   modelLocal,
   modelOpenrouter,
   modelNanogpt,
+  imageModelNanogpt,
   localUrl,
   systemPrompt,
   deepSearch,

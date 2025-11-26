@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -9,27 +10,51 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
 </head>
+
 <body>
   <aside class="sidebar" aria-label="Sidebar">
     <div class="sidebar-header">
       <button class="icon-btn" title="Menu" aria-label="Menu" id="collapseSidebarBtn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h18" />
+          <path d="M3 6h18" />
+          <path d="M3 18h18" />
+        </svg>
       </button>
       <div class="brand">SuperKagi</div>
     </div>
     <div class="sidebar-search">
       <div class="search-input">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
         <input type="text" id="chat-search" placeholder="Search" />
       </div>
     </div>
     <nav class="sidebar-nav">
       <button class="chip w-full" onclick="newChat()" title="New Chat" aria-label="New Chat">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
         New Chat
       </button>
       <button class="chip w-full" onclick="showConfig()" title="Settings" aria-label="Settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v4"/><path d="M12 19v4"/><path d="M4.22 4.22l2.83 2.83"/><path d="M16.95 16.95l2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="M4.22 19.78l2.83-2.83"/><path d="M16.95 7.05l2.83-2.83"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1v4" />
+          <path d="M12 19v4" />
+          <path d="M4.22 4.22l2.83 2.83" />
+          <path d="M16.95 16.95l2.83 2.83" />
+          <path d="M1 12h4" />
+          <path d="M19 12h4" />
+          <path d="M4.22 19.78l2.83-2.83" />
+          <path d="M16.95 7.05l2.83-2.83" />
+        </svg>
         Config
       </button>
     </nav>
@@ -43,7 +68,12 @@
   <main class="main">
     <header class="topbar">
       <button class="icon-btn mobile-only" id="mobileMenuBtn" aria-label="Open Menu">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h18" />
+          <path d="M3 6h18" />
+          <path d="M3 18h18" />
+        </svg>
       </button>
       <div class="top-space"></div>
     </header>
@@ -54,10 +84,16 @@
         <div class="hero-input">
           <div class="pill-input">
             <button class="icon-btn" title="Attach" aria-label="Attach" onclick="openFilePicker()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49" />
+              </svg>
             </button>
             <input class="input" id="input" placeholder="What do you want to know?" onkeydown="handleKey(event)" />
             <div class="input-actions">
+              <button class="chip" id="hero-imagegen" onclick="generateImage()" title="Generate Image"
+                style="display:none;">IMG</button>
               <button class="chip primary" onclick="sendMessage()">Send</button>
             </div>
           </div>
@@ -75,11 +111,17 @@
     <footer class="composer">
       <div class="composer-inner">
         <button class="icon-btn" title="Attach" aria-label="Attach" onclick="openFilePicker()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49" />
+          </svg>
         </button>
         <input class="input" id="composer-input" placeholder="Type a message…" onkeydown="handleComposerKey(event)" />
         <div class="composer-actions">
           <button class="chip toggle" id="composer-deepsearch" onclick="toggleDeepSearch()">DeepSearch</button>
+          <button class="chip" id="composer-imagegen" onclick="generateImageFromComposer()" title="Generate Image"
+            style="display:none;">IMG</button>
           <button class="chip primary" onclick="sendMessageFromComposer()">Send</button>
         </div>
       </div>
@@ -92,7 +134,11 @@
       <header class="settings-header">
         <h2 id="settings-title">Settings</h2>
         <button class="icon-btn" aria-label="Close" onclick="closeConfig()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </svg>
         </button>
       </header>
       <div class="settings-body">
@@ -115,13 +161,16 @@
 
             <div class="settings-row">
               <div class="row-label">Model</div>
-              <div class="row-content"><input class="field" id="model" placeholder="e.g., openrouter/auto or anthropic/claude-3.5-sonnet" value="llama3" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" /></div>
+              <div class="row-content"><input class="field" id="model"
+                  placeholder="e.g., openrouter/auto or anthropic/claude-3.5-sonnet" value="llama3" autocomplete="off"
+                  autocapitalize="none" spellcheck="false" inputmode="text" /></div>
             </div>
 
             <div class="settings-row only-openrouter">
               <div class="row-label">API Key</div>
               <div class="row-content">
-                <input class="field" id="api-key" placeholder="OpenRouter API Key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" />
+                <input class="field" id="api-key" placeholder="OpenRouter API Key" type="password" autocomplete="off"
+                  autocapitalize="none" spellcheck="false" inputmode="text" />
                 <div class="row-helpers">
                   <button class="mini-btn" onclick="toggleApiMask()" id="mask-toggle">Show</button>
                   <button class="mini-btn" onclick="copyApiKey()">Copy</button>
@@ -131,12 +180,82 @@
 
             <div class="settings-row only-local">
               <div class="row-label">Local URL</div>
-              <div class="row-content"><input class="field" id="local-url" placeholder="http://localhost:11434/v1" value="http://localhost:11434/v1" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="url" /></div>
+              <div class="row-content"><input class="field" id="local-url" placeholder="http://localhost:11434/v1"
+                  value="http://localhost:11434/v1" autocomplete="off" autocapitalize="none" spellcheck="false"
+                  inputmode="url" /></div>
+            </div>
+
+            <div class="settings-row only-nanogpt">
+              <div class="row-label">Image Model</div>
+              <div class="row-content">
+                <input class="field" id="image-model" placeholder="e.g., chroma, hidream" value="chroma"
+                  autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" />
+                <div id="image-model-picker" class="model-picker"
+                  style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                <div class="row-helpers">
+                  <span style="font-size: 12px; opacity: 0.7;">For image generation (IMG button)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row only-nanogpt">
+              <div class="row-label">Image Size</div>
+              <div class="row-content">
+                <select class="field" id="image-size" style="width: auto; min-width: 140px;">
+                  <option value="">Auto (model default)</option>
+                  <option value="256x256">256×256</option>
+                  <option value="512x512">512×512</option>
+                  <option value="1024x1024">1024×1024</option>
+                  <option value="1024x576">1024×576 (wide)</option>
+                  <option value="576x1024">576×1024 (tall)</option>
+                  <option value="1280x720">1280×720 (HD)</option>
+                  <option value="720x1280">720×1280 (HD tall)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="settings-row only-nanogpt">
+              <div class="row-label">Inference Steps</div>
+              <div class="row-content" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                  <input type="range" id="image-steps" min="1" max="100" value="30"
+                    style="flex: 1; accent-color: #f5f5f5;" oninput="updateStepsDisplay()" />
+                  <span id="image-steps-display" style="min-width: 32px; text-align: right;">30</span>
+                </div>
+                <span style="font-size: 11px; opacity: 0.6;">More steps = higher quality but slower (1-100)</span>
+              </div>
+            </div>
+
+            <div class="settings-row only-nanogpt">
+              <div class="row-label">Guidance Scale</div>
+              <div class="row-content" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                  <input type="range" id="image-guidance" min="0" max="20" value="7.5" step="0.5"
+                    style="flex: 1; accent-color: #f5f5f5;" oninput="updateGuidanceDisplay()" />
+                  <span id="image-guidance-display" style="min-width: 32px; text-align: right;">7.5</span>
+                </div>
+                <span style="font-size: 11px; opacity: 0.6;">How closely to follow the prompt (0-20)</span>
+              </div>
+            </div>
+
+            <div class="settings-row only-nanogpt">
+              <div class="row-label">Seed</div>
+              <div class="row-content" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                  <input class="field" type="number" id="image-seed" placeholder="Random" style="width: 140px;"
+                    min="0" />
+                  <button class="mini-btn" onclick="randomizeSeed()">🎲 Random</button>
+                  <button class="mini-btn" onclick="clearSeed()">Clear</button>
+                </div>
+                <span style="font-size: 11px; opacity: 0.6;">Same seed + settings = reproducible results</span>
+              </div>
             </div>
 
             <div class="settings-row">
               <div class="row-label">System Prompt</div>
-              <div class="row-content"><textarea class="field field-textarea" id="system-prompt" placeholder="Optional system instructions" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea></div>
+              <div class="row-content"><textarea class="field field-textarea" id="system-prompt"
+                  placeholder="Optional system instructions" autocomplete="off" autocapitalize="sentences"
+                  spellcheck="false"></textarea></div>
             </div>
 
             <div id="config-status" class="config-status" aria-live="polite"></div>
@@ -153,23 +272,77 @@
       </div>
     </div>
   </div>
-  <!-- Hidden file input for attachments -->
-  <input type="file" id="file-input" style="display:none" multiple accept="image/*,.txt,.md,.csv,.json,.log,.html,.htm,.pdf" />
+  <input type="file" id="file-input" style="display:none" multiple
+    accept="image/*,.txt,.md,.csv,.json,.log,.html,.htm,.pdf" />
   <script>
-    // Close settings on overlay click or Escape
-    document.getElementById('config-modal').addEventListener('click', (e)=>{
+    document.getElementById('config-modal').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) closeConfig();
     });
-    window.addEventListener('keydown', (e)=>{
+    window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeConfig();
     });
   </script>
 
   <script>
+    // Available NanoGPT image models
+    const nanoImageModels = [
+      { id: "chroma", name: "Chroma", pricing: "$0.009/img", resolutions: ["1024x1024", "1024x576", "576x1024"] },
+      { id: "hidream", name: "Hidream", pricing: "$0.014/img", resolutions: ["1024x1024", "1280x720", "720x1280"] },
+      { id: "artiwaifu-diffusion", name: "Juggernaut XL", pricing: "$0.003-$0.006/img", resolutions: ["1024x1024", "1024x576", "576x1024", "768x512", "512x768"] },
+      { id: "qwen-image", name: "Qwen Image", pricing: "$0.009/img", resolutions: ["1024x1024", "1280x720", "720x1280"] },
+    ];
+
     let currentChatId = localStorage.getItem('currentChatId') || Date.now().toString();
     const chats = JSON.parse(localStorage.getItem('chats') || '{}');
     let config = JSON.parse(localStorage.getItem('config') || '{}');
     let attachments = [];
+    let isGeneratingImage = false;
+
+    function updateStepsDisplay() {
+      const val = document.getElementById('image-steps').value;
+      document.getElementById('image-steps-display').textContent = val;
+    }
+
+    function updateGuidanceDisplay() {
+      const val = document.getElementById('image-guidance').value;
+      document.getElementById('image-guidance-display').textContent = val;
+    }
+
+    function randomizeSeed() {
+      const seed = Math.floor(Math.random() * 2147483647);
+      document.getElementById('image-seed').value = seed;
+    }
+
+    function clearSeed() {
+      document.getElementById('image-seed').value = '';
+    }
+
+    async function downloadImage(url, filename) {
+      try {
+        if (url.startsWith('data:')) {
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename || 'generated-image.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename || 'generated-image.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }
+      } catch (e) {
+        console.error('Download failed:', e);
+        alert('Failed to download image: ' + (e.message || e));
+      }
+    }
 
     let serverDefaults = null;
 
@@ -197,6 +370,7 @@
 
       if (!config || typeof config !== 'object') config = {};
       if (!config.models || typeof config.models !== 'object') config.models = {};
+      if (!config.imageModel) config.imageModel = env?.imageModelNanogpt || 'chroma';
       const hadUserSet = Object.hasOwn(config, 'userSet');
       if (!config.userSet || typeof config.userSet !== 'object') config.userSet = {};
       if (!config.userSet.models || typeof config.userSet.models !== 'object') config.userSet.models = {};
@@ -238,7 +412,6 @@
     }
 
     function loadConfig() {
-      // Normalize to provider-specific model map
       if (!config.models) {
         config.models = { local: config.model || 'llama3', openrouter: config.model || 'openrouter/auto' };
       }
@@ -249,14 +422,23 @@
       document.getElementById('model').value = activeModel;
       const apiKeyInput = document.getElementById('api-key');
       apiKeyInput.value = config.apiKey || '';
-      // If server has an API key set, hint via placeholder without revealing it
       if (serverDefaults && serverDefaults.hasApiKey && !config.apiKey) {
         apiKeyInput.placeholder = 'Using server default';
       } else {
         apiKeyInput.placeholder = '';
       }
       document.getElementById('local-url').value = config.localUrl || 'http://host.docker.internal:11434/api/chat';
+      document.getElementById('image-model').value = config.imageModel || 'chroma';
       document.getElementById('system-prompt').value = config.systemPrompt || '';
+
+      document.getElementById('image-size').value = config.imageSize || '';
+      document.getElementById('image-steps').value = config.imageSteps || 30;
+      document.getElementById('image-guidance').value = config.imageGuidance || 7.5;
+      document.getElementById('image-seed').value = config.imageSeed || '';
+      updateStepsDisplay();
+      updateGuidanceDisplay();
+
+      renderImageModelPicker();
       config.deepSearch = !!config.deepSearch;
       refreshDeepSearchToggle();
     }
@@ -272,23 +454,29 @@
         loadConfig();
         showStatus('Settings reset to defaults.', true);
       } catch (e) {
-        showStatus('Failed to reset settings: ' + (e.message||e), false);
+        showStatus('Failed to reset settings: ' + (e.message || e), false);
       }
     }
 
     function saveConfig() {
       const seg = document.querySelector('#provider-seg .seg.active');
       const provider = seg ? seg.getAttribute('data-value') : 'local';
-      // ensure models map exists
       if (!config.models) config.models = { local: 'llama3', openrouter: 'openrouter/auto' };
       const enteredModel = document.getElementById('model').value;
       config.models[provider] = enteredModel;
       config.provider = provider;
-      config.model = enteredModel; // keep legacy field for compatibility
+      config.model = enteredModel;
       config.apiKey = document.getElementById('api-key').value;
       config.localUrl = document.getElementById('local-url').value;
+      config.imageModel = document.getElementById('image-model').value;
       config.systemPrompt = document.getElementById('system-prompt').value;
       config.deepSearch = !!config.deepSearch;
+
+      config.imageSize = document.getElementById('image-size').value;
+      config.imageSteps = parseInt(document.getElementById('image-steps').value) || 30;
+      config.imageGuidance = parseFloat(document.getElementById('image-guidance').value) || 7.5;
+      const seedVal = document.getElementById('image-seed').value;
+      config.imageSeed = seedVal ? parseInt(seedVal) : null;
 
       if (!config.userSet || typeof config.userSet !== 'object') config.userSet = {};
       if (!config.userSet.models || typeof config.userSet.models !== 'object') config.userSet.models = {};
@@ -331,10 +519,15 @@
       });
       document.querySelectorAll('.only-openrouter').forEach(el => el.style.display = value === 'openrouter' ? 'grid' : 'none');
       document.querySelectorAll('.only-local').forEach(el => el.style.display = value === 'local' ? 'grid' : 'none');
+      document.querySelectorAll('.only-nanogpt').forEach(el => el.style.display = value === 'nanogpt' ? 'grid' : 'none');
+      const isNano = value === 'nanogpt';
+      const heroImageBtn = document.getElementById('hero-imagegen');
+      const composerImageBtn = document.getElementById('composer-imagegen');
+      if (heroImageBtn) heroImageBtn.style.display = isNano ? 'inline-flex' : 'none';
+      if (composerImageBtn) composerImageBtn.style.display = isNano ? 'inline-flex' : 'none';
       if (!config.models) config.models = { local: 'llama3', openrouter: 'openrouter/auto' };
       if (!config.userSet) config.userSet = { models: {} };
       if (!config.userSet.models) config.userSet.models = {};
-      // persist current field into previous provider slot
       const prev = config.provider || 'local';
       const modelInput = document.getElementById('model');
       if (modelInput && prev && persistCurrent && prev !== value) {
@@ -351,6 +544,28 @@
       const m = config.models[value] || '';
       if (modelInput) modelInput.value = m;
       config.model = m || config.model;
+    }
+
+    function renderImageModelPicker() {
+      const picker = document.getElementById('image-model-picker');
+      if (!picker) return;
+      const currentModel = document.getElementById('image-model').value || 'chroma';
+      picker.innerHTML = '';
+      nanoImageModels.forEach(m => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'chip' + (m.id === currentModel ? ' primary' : '');
+        pill.style.cssText = 'font-size: 12px; padding: 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 80px;';
+        pill.innerHTML = `<span style="font-weight: 600;">${m.name}</span><span style="opacity: 0.7; font-size: 10px;">${m.pricing}</span>`;
+        pill.title = `${m.name} - Resolutions: ${m.resolutions.join(', ')}`;
+        pill.onclick = () => selectImageModel(m.id);
+        picker.appendChild(pill);
+      });
+    }
+
+    function selectImageModel(modelId) {
+      document.getElementById('image-model').value = modelId;
+      renderImageModelPicker();
     }
 
     function toggleApiMask() {
@@ -406,14 +621,14 @@
         } else {
           labelText = last?.content || '';
         }
-        const label = (labelText || `Chat ${id.slice(-4)}`).slice(0,40);
+        const label = (labelText || `Chat ${id.slice(-4)}`).slice(0, 40);
         if (q && !label.toLowerCase().includes(q)) return;
         const li = document.createElement('li');
         li.innerHTML = `
-          <div class="chat-item ${id===currentChatId?'active':''}" title="${label.replace(/"/g,'&quot;')}">
+          <div class="chat-item ${id === currentChatId ? 'active' : ''}" title="${label.replace(/"/g, '&quot;')}">
             <div>
               <span class="chat-title">${label}</span>
-              <span class="chat-meta">${new Date(parseInt(id,10)).toLocaleDateString()}</span>
+              <span class="chat-meta">${new Date(parseInt(id, 10)).toLocaleDateString()}</span>
             </div>
             <button class="mini-btn" title="Delete" onclick="deleteChat('${id}'); event.stopPropagation();">Delete</button>
           </div>`;
@@ -430,8 +645,7 @@
     }
 
     function newChat() {
-      // If an empty chat exists, reuse it and move it to top by rekeying
-      const emptyIds = Object.keys(chats).filter(id => (chats[id]||[]).length === 0);
+      const emptyIds = Object.keys(chats).filter(id => (chats[id] || []).length === 0);
       if (emptyIds.length) {
         const oldId = emptyIds.sort().reverse()[0];
         const newId = Date.now().toString();
@@ -476,7 +690,7 @@
       const isEmpty = thread.length === 0;
       hero.style.display = isEmpty ? 'flex' : 'none';
       if (composer) composer.style.display = isEmpty ? 'none' : 'grid';
-      thread.forEach(msg => {
+      thread.forEach((msg, msgIdx) => {
         const div = document.createElement('div');
         div.className = `message ${msg.role}`;
         const bubble = document.createElement('div');
@@ -486,11 +700,25 @@
         } else {
           if (Array.isArray(msg.content)) {
             let html = '';
-            msg.content.forEach(part => {
+            msg.content.forEach((part, partIdx) => {
               if (part.type === 'text' || part.text) {
                 html += renderMD(part.text || '');
               } else if (part.type === 'image_url' && part.image_url?.url) {
-                html += `<img src="${part.image_url.url}" alt="image" />`;
+                const imgId = part.image_url.id || `img-${msgIdx}-${partIdx}`;
+                const imgUrl = part.image_url.url;
+                html += `<div class="image-container">
+                  <img src="${imgUrl}" alt="Generated image" />
+                  <div class="image-actions">
+                    <button class="image-action-btn" onclick="downloadImage('${imgUrl.replace(/'/g, "\\'")}', 'generated-${imgId}.png')" title="Download image">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Download
+                    </button>
+                  </div>
+                </div>`;
               }
             });
             bubble.innerHTML = html || '';
@@ -517,11 +745,9 @@
       const compInput = document.getElementById('composer-input');
       const active = getActiveInput();
       let message = active.value.trim();
-      // If DeepSearch is on, coerce prompt to the pattern that triggers web search
       if (config.deepSearch) {
         const lower = message.toLowerCase();
         if (!lower.startsWith('search for:') && !lower.startsWith('search:')) {
-          // If no text but attachments exist, provide a generic target
           if (!message && attachments.length > 0) message = 'Search for: information related to the attached files';
           else message = 'Search for: ' + message;
         }
@@ -533,13 +759,11 @@
       if (!chats[currentChatId]) chats[currentChatId] = [];
       const userContent = buildUserContentParts(message);
       chats[currentChatId].push({ role: 'user', content: userContent });
-      // reset attachments after adding
       attachments = [];
       renderAttachmentsPreviews();
       saveChats();
       renderChat();
 
-      // Add a transient typing placeholder
       const pending = { role: 'assistant', content: '', pending: true };
       chats[currentChatId].push(pending);
       saveChats();
@@ -568,7 +792,6 @@
         body: JSON.stringify(payload)
       });
       if (!res.ok || !res.body) {
-        // Fallback to non-stream path
         const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const { content } = await r.json();
         const thread = chats[currentChatId];
@@ -586,10 +809,9 @@
       let buffer = '';
       let assembled = '';
       let lastRender = 0;
-      // Keep updating the same pending bubble across tool-call cycles
       const updateBubble = (finalize = false) => {
         const now = Date.now();
-        if (!finalize && (now - lastRender) < 60) return; // throttle
+        if (!finalize && (now - lastRender) < 60) return;
         const thread = chats[currentChatId];
         let updated = false;
         for (let i = thread.length - 1; i >= 0; i--) {
@@ -626,7 +848,7 @@
               assembled += data.content;
               updateBubble(false);
             }
-          } catch {}
+          } catch { }
         }
       }
       updateBubble(true);
@@ -638,11 +860,101 @@
 
     function sendMessageFromComposer() { sendMessage(); }
 
+    async function generateImage() {
+      const heroInput = document.getElementById('input');
+      const compInput = document.getElementById('composer-input');
+      const active = getActiveInput();
+      const prompt = active.value.trim();
+      if (!prompt) return;
+      if (config.provider !== 'nanogpt') {
+        alert('Image generation is only available with the NanoGPT provider.');
+        return;
+      }
+      if (isGeneratingImage) return;
+      isGeneratingImage = true;
+      heroInput.value = '';
+      compInput.value = '';
+
+      if (!chats[currentChatId]) chats[currentChatId] = [];
+      chats[currentChatId].push({ role: 'user', content: '[Image] Generate: ' + prompt });
+      const pending = { role: 'assistant', content: '', pending: true };
+      chats[currentChatId].push(pending);
+      saveChats();
+      renderChat();
+
+      try {
+        const requestBody = {
+          prompt,
+          model: config.imageModel || 'chroma',
+          apiKey: config.apiKey
+        };
+
+        if (config.imageSize) requestBody.size = config.imageSize;
+        if (config.imageSteps) requestBody.num_inference_steps = config.imageSteps;
+        if (config.imageGuidance) requestBody.guidance_scale = config.imageGuidance;
+        if (config.imageSeed) requestBody.seed = config.imageSeed;
+
+        const res = await fetch('/api/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        const data = await res.json();
+        const thread = chats[currentChatId];
+
+        if (!res.ok || !data.images?.[0]?.url) {
+          const errorMsg = data.error || data.details || 'Image generation failed';
+          for (let i = thread.length - 1; i >= 0; i--) {
+            if (thread[i] && thread[i].pending) {
+              thread[i] = { role: 'assistant', content: 'Error: ' + errorMsg };
+              break;
+            }
+          }
+        } else {
+          const imageUrl = data.images[0].url;
+          const imageId = Date.now().toString();
+          const content = [{ type: 'image_url', image_url: { url: imageUrl, id: imageId } }];
+
+          const infoLines = [];
+          if (data.cost) infoLines.push(`Cost: $${data.cost.toFixed(4)}`);
+          if (config.imageSize) infoLines.push(`Size: ${config.imageSize}`);
+          if (config.imageSteps && config.imageSteps !== 30) infoLines.push(`Steps: ${config.imageSteps}`);
+          if (config.imageGuidance && config.imageGuidance !== 7.5) infoLines.push(`Guidance: ${config.imageGuidance}`);
+          if (config.imageSeed) infoLines.push(`Seed: ${config.imageSeed}`);
+
+          if (infoLines.length > 0) {
+            content.push({ type: 'text', text: infoLines.join(' • ') });
+          }
+
+          for (let i = thread.length - 1; i >= 0; i--) {
+            if (thread[i] && thread[i].pending) {
+              thread[i] = { role: 'assistant', content };
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        const thread = chats[currentChatId];
+        for (let i = thread.length - 1; i >= 0; i--) {
+          if (thread[i] && thread[i].pending) {
+            thread[i] = { role: 'assistant', content: 'Error: ' + (e.message || e) };
+            break;
+          }
+        }
+      } finally {
+        isGeneratingImage = false;
+        saveChats();
+        renderChat();
+      }
+    }
+
+    function generateImageFromComposer() { generateImage(); }
+
     function handleComposerKey(event) {
       if (event.key === 'Enter') sendMessageFromComposer();
     }
 
-    function deepSearch() { // backward compat alias
+    function deepSearch() {
       toggleDeepSearch();
     }
 
@@ -667,25 +979,21 @@
       el?.focus();
     }
 
-    // Minimal markdown rendering (safe, escaped)
     function renderMarkdown(text) {
       const esc = (s) => s
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-      // Code blocks ```lang\n...```
       let html = '';
       const parts = (text + '\n').split(/```/);
       for (let i = 0; i < parts.length; i++) {
         if (i % 2 === 0) {
-          // normal text: inline code and bold
           const p = parts[i]
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/`([^`]+?)`/g, '<code>$1</code>');
           html += esc(p).replace(/\n/g, '<br/>');
         } else {
-          // code block: optional language on first line
           const seg = parts[i];
           const nl = seg.indexOf('\n');
           const lang = nl === -1 ? '' : esc(seg.slice(0, nl).trim());
@@ -696,7 +1004,6 @@
       return html;
     }
 
-    // Sidebar toggle for mobile
     function toggleSidebar(force) {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.getElementById('sidebar-overlay');
@@ -713,7 +1020,6 @@
       }
     }
 
-    // Desktop collapse toggle
     function isMobileView() {
       return window.matchMedia('(max-width: 780px)').matches;
     }
@@ -721,28 +1027,25 @@
     function toggleSidebarCollapsed(force) {
       const body = document.body;
       const shouldCollapse = (typeof force === 'boolean') ? force : !body.classList.contains('sidebar-collapsed');
-      // Only meaningful on desktop widths; on mobile we use the overlay menu instead
       if (isMobileView()) {
         body.classList.remove('sidebar-collapsed');
         return;
       }
       body.classList.toggle('sidebar-collapsed', shouldCollapse);
-      try { localStorage.setItem('sidebarCollapsed', shouldCollapse ? '1' : '0'); } catch (_) {}
+      try { localStorage.setItem('sidebarCollapsed', shouldCollapse ? '1' : '0'); } catch (_) { }
     }
 
-    (document.getElementById('mobileMenuBtn')||{}).onclick = () => toggleSidebar();
-    (document.getElementById('collapseSidebarBtn')||{}).onclick = () => {
+    (document.getElementById('mobileMenuBtn') || {}).onclick = () => toggleSidebar();
+    (document.getElementById('collapseSidebarBtn') || {}).onclick = () => {
       if (isMobileView()) toggleSidebar();
       else toggleSidebarCollapsed();
     };
-    (document.getElementById('sidebar-overlay')||{}).onclick = () => toggleSidebar(false);
+    (document.getElementById('sidebar-overlay') || {}).onclick = () => toggleSidebar(false);
 
-    // Safer markdown renderer: headings, lists, links, tables, code, bold, inline code
     function renderMD(text) {
       const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
       function renderInline(segment) {
-        // Build with proper escaping but keep <a> tags intact
         const linkRE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
         let out = '';
         let last = 0; let m;
@@ -754,11 +1057,9 @@
           last = m.index + m[0].length;
         }
         out += esc(segment.slice(last));
-        // Bold and inline code
         out = out
           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           .replace(/`([^`]+?)`/g, '<code>$1</code>');
-        // Allow explicit line breaks inserted by models
         out = out.replace(/&lt;br\/?&gt;/g, '<br/>');
         return out;
       }
@@ -776,13 +1077,12 @@
         for (let i = 0; i < lines.length; i++) {
           const raw = lines[i];
           const line = raw.trimEnd();
-          if (!line.trim()) { // blank line
+          if (!line.trim()) {
             closeList();
             continue;
           }
-          // Table detection: header row starting with '|' and a separator on next line
           if (line.startsWith('|')) {
-            const next = (lines[i+1] || '').trim();
+            const next = (lines[i + 1] || '').trim();
             if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next)) {
               const headers = splitCells(line);
               i++; // skip separator
@@ -790,7 +1090,7 @@
               html += '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
               headers.forEach(h => { html += `<th>${renderInline(h.trim())}</th>`; });
               html += '</tr></thead><tbody>';
-              while (i+1 < lines.length && lines[i+1].trim().startsWith('|')) {
+              while (i + 1 < lines.length && lines[i + 1].trim().startsWith('|')) {
                 i++;
                 const cells = splitCells(lines[i].trim());
                 html += '<tr>';
@@ -839,7 +1139,6 @@
       return html;
     }
 
-    // Initial load
     (async function init() {
       const env = await getServerDefaults();
       mergeEnvDefaults(env);
@@ -851,7 +1150,6 @@
       if (!config.provider) showConfig();
     })();
 
-    // Apply persisted desktop sidebar collapsed state and keep it in sync on resize
     (function initSidebarCollapsedPref() {
       const pref = (localStorage.getItem('sidebarCollapsed') === '1');
       if (pref && !isMobileView()) document.body.classList.add('sidebar-collapsed');
@@ -865,7 +1163,6 @@
       });
     })();
 
-    // Attachments: picker and processing
     document.getElementById('file-input').addEventListener('change', async (e) => {
       const files = Array.from(e.target.files || []);
       for (const f of files) {
@@ -876,7 +1173,6 @@
       e.target.value = '';
     });
 
-    // Drag & drop support
     document.addEventListener('dragover', (e) => { e.preventDefault(); });
     document.addEventListener('drop', async (e) => {
       e.preventDefault();
@@ -889,13 +1185,9 @@
       renderAttachmentsPreviews();
     });
 
-    // Paste support
-    // - If files/images on clipboard: attach them (and prevent default)
-    // - If plain text and user is typing in the chat input: let the input handle it (no attachment)
-    // - If plain text and focus is elsewhere: create a text attachment
     document.addEventListener('paste', async (e) => {
       const files = Array.from(e.clipboardData?.files || []);
-      const active = document.activeElement; // HTMLElement or null
+      const active = document.activeElement;
       const activeId = (active && (active).id) || '';
       const activeTag = (active && (active).tagName) || '';
       const isChatInput = !!active && (
@@ -917,7 +1209,6 @@
       const text = e.clipboardData?.getData('text');
       if (text && text.trim()) {
         if (isChatInput) {
-          // Let the input handle normal text paste; do not add a duplicate attachment
           return;
         }
         attachments.push({ kind: 'text', name: 'pasted.txt', text });
@@ -943,7 +1234,7 @@
     function readAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result); r.readAsDataURL(file); }); }
     function readAsText(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result); r.readAsText(file); }); }
 
-    const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB soft cap for data URLs
+    const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
     async function optimizeImage(dataUrl, maxDim = 1600, quality = 0.85) {
       try {
@@ -958,7 +1249,6 @@
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
-        // Prefer jpeg to shrink size
         const out = canvas.toDataURL('image/jpeg', quality);
         return out && out.length < dataUrl.length ? out : dataUrl;
       } catch { return dataUrl; }
@@ -969,7 +1259,7 @@
       const type = (file.type || '').toLowerCase();
       const ext = extOf(name);
       try {
-        if (type.startsWith('image/') || ['png','jpg','jpeg','gif','webp'].includes(ext)) {
+        if (type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
           let url = await readAsDataURL(file);
           url = await optimizeImage(url, 1600, 0.85);
           if (url.length > MAX_UPLOAD_BYTES) url = await optimizeImage(url, 1200, 0.8);
@@ -979,21 +1269,20 @@
           }
           return { kind: 'image', name, url };
         }
-        if (['txt','md','csv','json','log','html','htm'].includes(ext) || type.startsWith('text/')) {
+        if (['txt', 'md', 'csv', 'json', 'log', 'html', 'htm'].includes(ext) || type.startsWith('text/')) {
           let text = await readAsText(file);
           text = String(text || '').slice(0, 20000);
           return { kind: 'text', name, text };
         }
         if (ext === 'pdf' || type === 'application/pdf') {
-          // fallback: include marker only
           return { kind: 'note', name, text: `[Attached PDF: ${name}]` };
         }
-      } catch (e) {}
+      } catch (e) { }
       return { kind: 'note', name, text: `[Attached file: ${name}]` };
     }
 
     function renderAttachmentsPreviews() {
-      const hostIds = ['hero-attachments','composer-attachments'];
+      const hostIds = ['hero-attachments', 'composer-attachments'];
       hostIds.forEach(id => {
         const host = document.getElementById(id);
         if (!host) return;
@@ -1009,7 +1298,7 @@
     }
 
     function removeAttachment(i) {
-      attachments.splice(i,1);
+      attachments.splice(i, 1);
       renderAttachmentsPreviews();
     }
 
@@ -1027,9 +1316,10 @@
           parts.push({ type: 'text', text: a.text });
         }
       }
-      if (parts.length === 1 && parts[0].type === 'text') return parts[0].text; // keep simple
+      if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
       return parts;
     }
   </script>
 </body>
+
 </html>

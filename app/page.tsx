@@ -3,7 +3,6 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// Types
 export type Provider = "local" | "openrouter" | "nanogpt";
 
 export type ContentPart =
@@ -23,6 +22,11 @@ export type UiConfig = {
   provider: Provider;
   model: string;
   models: { local: string; openrouter: string; nanogpt: string };
+  imageModel: string;
+  imageSize: string;
+  imageSteps: number;
+  imageGuidanceScale: number;
+  imageSeed?: number;
   apiKey?: string;
   localUrl: string;
   systemPrompt: string;
@@ -30,6 +34,11 @@ export type UiConfig = {
   userSet?: {
     provider?: boolean;
     models?: { local?: boolean; openrouter?: boolean; nanogpt?: boolean };
+    imageModel?: boolean;
+    imageSize?: boolean;
+    imageSteps?: boolean;
+    imageGuidanceScale?: boolean;
+    imageSeed?: boolean;
     localUrl?: boolean;
     systemPrompt?: boolean;
     deepSearch?: boolean;
@@ -42,11 +51,74 @@ const defaultModels = {
   openrouter: "openrouter/auto",
   nanogpt: "moonshotai/kimi-k2-thinking",
 };
+const defaultImageModel = "chroma";
+
+const nanoImageModels = [
+  {
+    id: "chroma",
+    name: "Chroma",
+    pricing: "$0.009/img",
+    resolutions: [
+      "1024x1024",
+      "512x512",
+      "768x1024",
+      "576x1024",
+      "1024x768",
+      "1024x576",
+    ],
+  },
+  {
+    id: "hidream",
+    name: "Hidream",
+    pricing: "$0.014/img",
+    resolutions: [
+      "1024x1024",
+      "768x1360",
+      "1360x768",
+      "880x1168",
+      "1168x880",
+      "1248x832",
+      "832x1248",
+    ],
+  },
+  {
+    id: "artiwaifu-diffusion",
+    name: "Juggernaut XL",
+    pricing: "$0.003-$0.006/img",
+    resolutions: [
+      "1024x1024",
+      "1920x1088",
+      "1088x1920",
+      "768x1024",
+      "1024x768",
+      "1408x1024",
+      "1024x1408",
+      "512x512",
+      "2048x2048",
+    ],
+  },
+  {
+    id: "qwen-image",
+    name: "Qwen Image",
+    pricing: "$0.009/img",
+    resolutions: [
+      "auto",
+      "1024x1024",
+      "512x512",
+      "768x1024",
+      "576x1024",
+      "1024x768",
+      "1024x576",
+    ],
+  },
+];
+
 const fallbackDefaults = {
   provider: "local" as Provider,
   modelLocal: defaultModels.local,
   modelOpenrouter: defaultModels.openrouter,
   modelNanogpt: defaultModels.nanogpt,
+  imageModelNanogpt: defaultImageModel,
   hasApiKey: false,
   hasNanoApiKey: false,
   localUrl: "http://host.docker.internal:11434/api/chat",
@@ -67,6 +139,10 @@ const initialConfig: UiConfig = {
     openrouter: fallbackDefaults.modelOpenrouter,
     nanogpt: fallbackDefaults.modelNanogpt,
   },
+  imageModel: fallbackDefaults.imageModelNanogpt,
+  imageSize: "1024x1024",
+  imageSteps: 30,
+  imageGuidanceScale: 7.5,
   apiKey: "",
   localUrl: fallbackDefaults.localUrl,
   systemPrompt: fallbackDefaults.systemPrompt,
@@ -119,6 +195,12 @@ function mergeEnvDefaults(
     models,
     provider,
     model,
+    imageModel:
+      existing.imageModel || env.imageModelNanogpt || defaultImageModel,
+    imageSize: existing.imageSize || "1024x1024",
+    imageSteps: existing.imageSteps || 30,
+    imageGuidanceScale: existing.imageGuidanceScale || 7.5,
+    imageSeed: existing.imageSeed,
     localUrl: existing.localUrl || env.localUrl,
     systemPrompt: existing.systemPrompt ?? env.systemPrompt,
     deepSearch:
@@ -146,6 +228,7 @@ export default function Page() {
     ok?: boolean;
   } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [nanoModels, setNanoModels] = useState<
     { id: string; label: string; pricing?: string }[]
   >([]);
@@ -153,12 +236,12 @@ export default function Page() {
   const [nanoModelsStatus, setNanoModelsStatus] = useState("");
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [imageSettingsExpanded, setImageSettingsExpanded] = useState(false);
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hydrate from localStorage and fetch defaults once
   useEffect(() => {
     const storedConfig = safeParseLocal<UiConfig>("config");
     const storedChats = safeParseLocal<ChatMap>("chats");
@@ -181,7 +264,6 @@ export default function Page() {
     setHydrated(true);
   }, []);
 
-  // Ensure at least one chat exists and reuse existing empty chats on refresh
   useEffect(() => {
     if (!hydrated) return;
     if (currentChatId) {
@@ -213,7 +295,6 @@ export default function Page() {
     } catch {}
   }, [currentChatId, chats, hydrated]);
 
-  // Persist config and chats on change
   useEffect(() => {
     try {
       localStorage.setItem("config", JSON.stringify(config));
@@ -225,7 +306,6 @@ export default function Page() {
     } catch {}
   }, [chats]);
 
-  // Attach drag/drop and paste handlers
   useEffect(() => {
     const onDragOver = (e: DragEvent) => e.preventDefault();
     const onDrop = async (e: DragEvent) => {
@@ -271,7 +351,6 @@ export default function Page() {
     };
   }, []);
 
-  // Keep layout-related state on the body element for the grid shell and modal behavior
   useEffect(() => {
     const body = document.body;
     const classMap = {
@@ -289,7 +368,6 @@ export default function Page() {
     };
   }, [showConfig, sidebarOpen, sidebarCollapsed]);
 
-  // Keep sidebar collapse preference on desktop; ensure it's off on mobile widths
   useEffect(() => {
     const stored = localStorage.getItem("sidebarCollapsed");
     if (stored === "true") setSidebarCollapsed(true);
@@ -530,6 +608,110 @@ export default function Page() {
     }
   }
 
+  async function generateImage(source: "hero" | "composer") {
+    const text = source === "hero" ? heroValue.trim() : composerValue.trim();
+    if (!text) return;
+
+    if (config.provider !== "nanogpt") {
+      alert("Image generation is only available with the NanoGPT provider.");
+      return;
+    }
+
+    setHeroValue("");
+    setComposerValue("");
+    setIsGeneratingImage(true);
+
+    const chatId = currentChatId || Date.now().toString();
+    const userMsg: ChatMessage = {
+      role: "user",
+      content: `[Image] Generate: ${text}`,
+    };
+    const pending: ChatMessage = {
+      role: "assistant",
+      content: "",
+      pending: true,
+    };
+
+    setChats((prev) => {
+      const thread = prev[chatId] ? [...prev[chatId]] : [];
+      thread.push(userMsg, pending);
+      return { ...prev, [chatId]: thread };
+    });
+    setSidebarOpen(false);
+
+    try {
+      const res = await fetch("/api/images/generations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          model: config.imageModel || defaultImageModel,
+          size: config.imageSize,
+          num_inference_steps: config.imageSteps,
+          guidance_scale: config.imageGuidanceScale,
+          seed: config.imageSeed,
+          apiKey: config.apiKey,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.images?.[0]?.url) {
+        const errorMsg =
+          data.error || data.details || "Image generation failed";
+        setChats((prev) => {
+          const thread = [...(prev[chatId] || [])];
+          for (let i = thread.length - 1; i >= 0; i--) {
+            if (thread[i].role === "assistant" && thread[i].pending) {
+              thread[i] = { role: "assistant", content: `Error: ${errorMsg}` };
+              break;
+            }
+          }
+          return { ...prev, [chatId]: thread };
+        });
+        return;
+      }
+
+      const imageUrl = data.images[0].url;
+      const imageContent: ContentPart[] = [
+        { type: "image_url", image_url: { url: imageUrl } },
+      ];
+      if (data.cost) {
+        imageContent.push({
+          type: "text",
+          text: `Cost: $${data.cost.toFixed(4)}`,
+        });
+      }
+
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        for (let i = thread.length - 1; i >= 0; i--) {
+          if (thread[i].role === "assistant" && thread[i].pending) {
+            thread[i] = { role: "assistant", content: imageContent };
+            break;
+          }
+        }
+        return { ...prev, [chatId]: thread };
+      });
+    } catch (e) {
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        for (let i = thread.length - 1; i >= 0; i--) {
+          if (thread[i].role === "assistant" && thread[i].pending) {
+            thread[i] = {
+              role: "assistant",
+              content: `Error: ${(e as Error).message}`,
+            };
+            break;
+          }
+        }
+        return { ...prev, [chatId]: thread };
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }
+
   function newChat() {
     const empty = Object.keys(chats).find(
       (id) => (chats[id] || []).length === 0,
@@ -714,6 +896,13 @@ export default function Page() {
             openrouter: models.openrouter !== serverDefaults.modelOpenrouter,
             nanogpt: models.nanogpt !== serverDefaults.modelNanogpt,
           },
+          imageModel:
+            prev.imageModel !==
+            (serverDefaults.imageModelNanogpt || defaultImageModel),
+          imageSize: prev.imageSize !== "1024x1024",
+          imageSteps: prev.imageSteps !== 30,
+          imageGuidanceScale: prev.imageGuidanceScale !== 7.5,
+          imageSeed: prev.imageSeed !== undefined,
           localUrl: prev.localUrl !== serverDefaults.localUrl,
           systemPrompt: prev.systemPrompt !== serverDefaults.systemPrompt,
           deepSearch: prev.deepSearch !== serverDefaults.deepSearch,
@@ -1014,6 +1203,17 @@ export default function Page() {
                   onKeyDown={(e) => e.key === "Enter" && sendMessage("hero")}
                 />
                 <div className="input-actions">
+                  {config.provider === "nanogpt" && (
+                    <button
+                      type="button"
+                      className="chip"
+                      onClick={() => generateImage("hero")}
+                      disabled={isGeneratingImage}
+                      title="Generate Image"
+                    >
+                      {isGeneratingImage ? "…" : "IMG"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="chip primary"
@@ -1116,6 +1316,17 @@ export default function Page() {
               >
                 DeepSearch
               </button>
+              {config.provider === "nanogpt" && (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => generateImage("composer")}
+                  disabled={isGeneratingImage}
+                  title="Generate Image"
+                >
+                  {isGeneratingImage ? "…" : "IMG"}
+                </button>
+              )}
               <button
                 type="button"
                 className="chip primary"
@@ -1408,6 +1619,241 @@ export default function Page() {
                       />
                     </div>
                   </div>
+
+                  <div
+                    className="settings-row"
+                    style={{
+                      display: config.provider === "nanogpt" ? "grid" : "none",
+                    }}
+                  >
+                    <div className="row-label">Image Model</div>
+                    <div
+                      className="row-content"
+                      style={{
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: "10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <input
+                          className="field"
+                          id="image-model"
+                          value={config.imageModel || ""}
+                          onChange={(e) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              imageModel: e.target.value,
+                            }))
+                          }
+                          placeholder="e.g., chroma, hidream"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="nano-models">
+                        <div className="nano-status">
+                          Available image models for IMG button:
+                        </div>
+                        <div className="nano-model-list">
+                          {nanoImageModels.map((m) => (
+                            <button
+                              type="button"
+                              key={m.id}
+                              className={clsx("model-pill", {
+                                active: config.imageModel === m.id,
+                              })}
+                              onClick={() =>
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  imageModel: m.id,
+                                }))
+                              }
+                              title={`${m.name} - ${m.resolutions.join(", ")}`}
+                            >
+                              <span className="label">{m.name}</span>
+                              <span className="meta">{m.pricing}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="settings-row"
+                    style={{
+                      display: config.provider === "nanogpt" ? "grid" : "none",
+                    }}
+                  >
+                    <div className="row-label">
+                      <button
+                        type="button"
+                        className="expand-toggle"
+                        onClick={() =>
+                          setImageSettingsExpanded(!imageSettingsExpanded)
+                        }
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "var(--text)",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: 0,
+                          width: "100%",
+                          textAlign: "left",
+                        }}
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{
+                            transform: imageSettingsExpanded
+                              ? "rotate(90deg)"
+                              : "rotate(0deg)",
+                            transition: "transform 0.2s ease",
+                          }}
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                        Image Generation Settings
+                      </button>
+                    </div>
+                    <div className="row-content">
+                      <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                        Configure size, steps, and other parameters
+                      </div>
+                    </div>
+                  </div>
+
+                  {imageSettingsExpanded && config.provider === "nanogpt" && (
+                    <>
+                      <div className="settings-row image-setting">
+                        <div className="row-label">Image Size</div>
+                        <div className="row-content">
+                          <select
+                            className="field"
+                            value={config.imageSize}
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                imageSize: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="256x256">256x256</option>
+                            <option value="512x512">512x512</option>
+                            <option value="768x1024">
+                              768x1024 (Portrait)
+                            </option>
+                            <option value="576x1024">
+                              576x1024 (Portrait 9:16)
+                            </option>
+                            <option value="1024x768">
+                              1024x768 (Landscape)
+                            </option>
+                            <option value="1024x576">
+                              1024x576 (Landscape 16:9)
+                            </option>
+                            <option value="1024x1024">
+                              1024x1024 (Square)
+                            </option>
+                            <option value="1920x1088">
+                              1920x1088 (Landscape HD)
+                            </option>
+                            <option value="1088x1920">
+                              1088x1920 (Portrait HD)
+                            </option>
+                            <option value="1408x1024">
+                              1408x1024 (Landscape Wide)
+                            </option>
+                            <option value="1024x1408">
+                              1024x1408 (Portrait Tall)
+                            </option>
+                            <option value="2048x2048">
+                              2048x2048 (Large Square)
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="settings-row image-setting">
+                        <div className="row-label">Steps</div>
+                        <div className="row-content">
+                          <input
+                            type="number"
+                            className="field"
+                            min="1"
+                            max="100"
+                            value={config.imageSteps}
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                imageSteps: parseInt(e.target.value, 10) || 30,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="settings-row image-setting">
+                        <div className="row-label">Guidance Scale</div>
+                        <div className="row-content">
+                          <input
+                            type="number"
+                            className="field"
+                            min="0"
+                            max="20"
+                            step="0.1"
+                            value={config.imageGuidanceScale}
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                imageGuidanceScale:
+                                  parseFloat(e.target.value) || 7.5,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="settings-row image-setting">
+                        <div className="row-label">Seed (Optional)</div>
+                        <div className="row-content">
+                          <input
+                            type="number"
+                            className="field"
+                            min="0"
+                            placeholder="Random"
+                            value={config.imageSeed || ""}
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                imageSeed: e.target.value
+                                  ? parseInt(e.target.value, 10)
+                                  : undefined,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="settings-row">
                     <div className="row-label">System Prompt</div>
