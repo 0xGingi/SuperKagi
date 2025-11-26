@@ -167,7 +167,7 @@
 
   <script>
     let currentChatId = localStorage.getItem('currentChatId') || Date.now().toString();
-    let chats = JSON.parse(localStorage.getItem('chats') || '{}');
+    const chats = JSON.parse(localStorage.getItem('chats') || '{}');
     let config = JSON.parse(localStorage.getItem('config') || '{}');
     let attachments = [];
 
@@ -197,7 +197,7 @@
 
       if (!config || typeof config !== 'object') config = {};
       if (!config.models || typeof config.models !== 'object') config.models = {};
-      const hadUserSet = Object.prototype.hasOwnProperty.call(config, 'userSet');
+      const hadUserSet = Object.hasOwn(config, 'userSet');
       if (!config.userSet || typeof config.userSet !== 'object') config.userSet = {};
       if (!config.userSet.models || typeof config.userSet.models !== 'object') config.userSet.models = {};
       if (typeof config.userSet.apiKey === 'undefined') config.userSet.apiKey = !!config.apiKey;
@@ -410,7 +410,7 @@
         if (q && !label.toLowerCase().includes(q)) return;
         const li = document.createElement('li');
         li.innerHTML = `
-          <div class="chat-item ${id===currentChatId?'active':''}" title="${label.replace(/\"/g,'&quot;')}">
+          <div class="chat-item ${id===currentChatId?'active':''}" title="${label.replace(/"/g,'&quot;')}">
             <div>
               <span class="chat-title">${label}</span>
               <span class="chat-meta">${new Date(parseInt(id,10)).toLocaleDateString()}</span>

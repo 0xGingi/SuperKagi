@@ -7,4 +7,5 @@ services:
       - .env
     security_opt:
       - seccomp:unconfined
+      - label:disable
     restart: unless-stopped
