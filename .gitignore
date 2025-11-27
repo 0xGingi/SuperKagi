@@ -7,3 +7,4 @@ out
 npm-debug.log*
 .vercel
 package-lock.json
+data/*
