@@ -534,6 +534,16 @@ a {
 
 .bubble.typing {
   padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    120deg,
+    var(--bg-card),
+    var(--panel-2),
+    var(--bg-card)
+  );
+  background-size: 200% 200%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }
 
 .typing-dots {
@@ -568,6 +578,88 @@ a {
 
   40% {
     opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.message-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.message-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message:hover .message-actions,
+.message:focus-within .message-actions {
+  opacity: 1;
+}
+
+.mini-btn.ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.mini-btn.ghost:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+.message-error {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #6b1b1b;
+  background: #2a0f0f;
+  color: #ffd9d9;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+:root.light .message-error {
+  background: #fff5f5;
+  border-color: #f5c2c2;
+  color: #7a1b1b;
+}
+
+.edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 780px) {
+  .message-row {
+    grid-template-columns: 1fr;
+  }
+
+  .message-actions {
+    opacity: 1;
+    justify-content: flex-start;
   }
 }
 

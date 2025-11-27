@@ -27,7 +27,11 @@ export type ContentPart =
 export type ChatMessage = {
   role: "user" | "assistant" | "tool";
   content: string | ContentPart[];
+  id?: string;
   pending?: boolean;
+  error?: string;
+  createdAt?: number;
+  edited?: boolean;
   tool_call_id?: string;
 };
 
@@ -167,6 +171,27 @@ const initialConfig: UiConfig = {
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
+function createMessageId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function messageText(content: ChatMessage["content"]): string {
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (part.type === "text") return part.text;
+        if (part.type === "image_url") return `[Image] ${part.image_url.url}`;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return content || "";
+}
+
 function resolveProvider(value?: string): Provider {
   if (value === "openrouter" || value === "nanogpt") return value;
   return "local";
@@ -258,6 +283,11 @@ export default function Page() {
   const [customShortcuts, setCustomShortcuts] = useState<CustomShortcuts>({});
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
   const [recordingKey, setRecordingKey] = useState<string>("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -284,6 +314,26 @@ export default function Page() {
 
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setChats((prev) => {
+      let changed = false;
+      const next: ChatMap = {};
+      Object.entries(prev).forEach(([id, msgs]) => {
+        next[id] = (msgs || []).map((m, idx) => {
+          if (m.id) return m;
+          changed = true;
+          return {
+            ...m,
+            id: `${id}-${idx}`,
+            createdAt: m.createdAt || Date.now(),
+          };
+        });
+      });
+      return changed ? next : prev;
+    });
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -432,6 +482,11 @@ export default function Page() {
   // Keyboard shortcuts
   const { setTheme, theme } = useTheme();
 
+  useEffect(() => {
+    if (!editingMessageId) return;
+    editInputRef.current?.focus();
+  }, [editingMessageId]);
+
   // Create shortcut handlers map
   // biome-ignore lint/correctness/useExhaustiveDependencies: Functions are stable and defined below
   const shortcutHandlers: Record<string, () => void> = useMemo(
@@ -500,6 +555,31 @@ export default function Page() {
     else heroInputRef.current?.focus();
   }
 
+  function getActiveModel() {
+    return (
+      config.models?.[config.provider] ||
+      config.model ||
+      (config.provider === "openrouter"
+        ? defaultModels.openrouter
+        : config.provider === "nanogpt"
+          ? defaultModels.nanogpt
+          : defaultModels.local)
+    );
+  }
+
+  function buildPayload(messages: ChatMessage[]) {
+    return {
+      messages,
+      provider: config.provider,
+      model: getActiveModel(),
+      apiKey: config.apiKey,
+      localUrl: config.localUrl,
+      systemPrompt:
+        (config.systemPrompt || "") +
+        (config.deepSearch ? deepSearchPrompt : ""),
+    };
+  }
+
   function buildUserContentParts(text: string) {
     const parts: ContentPart[] = [];
     if (text?.trim()) parts.push({ type: "text", text });
@@ -538,53 +618,47 @@ export default function Page() {
 
     const userContent = buildUserContentParts(message);
     const chatId = currentChatId || Date.now().toString();
-    const userMsg: ChatMessage = { role: "user", content: userContent };
+    const userMsg: ChatMessage = {
+      role: "user",
+      content: userContent,
+      id: createMessageId(),
+      createdAt: Date.now(),
+    };
+    const assistantId = createMessageId();
     const pending: ChatMessage = {
       role: "assistant",
       content: "",
       pending: true,
+      id: assistantId,
+      createdAt: Date.now(),
     };
 
-    setChats((prev) => {
-      const thread = prev[chatId] ? [...prev[chatId]] : [];
-      thread.push(userMsg, pending);
-      return { ...prev, [chatId]: thread };
-    });
+    const nextThread = (chats[chatId] ? [...chats[chatId]] : []).concat(
+      userMsg,
+      pending,
+    );
+
+    setChats((prev) => ({ ...prev, [chatId]: nextThread }));
     setAttachments([]);
     setSidebarOpen(false);
 
-    const messagesToSend = threadWithoutPending(chats[chatId], userMsg);
-    const activeModel =
-      config.models?.[config.provider] ||
-      config.model ||
-      (config.provider === "openrouter"
-        ? defaultModels.openrouter
-        : config.provider === "nanogpt"
-          ? defaultModels.nanogpt
-          : defaultModels.local);
-    const payload = {
-      messages: messagesToSend,
-      provider: config.provider,
-      model: activeModel,
-      apiKey: config.apiKey,
-      localUrl: config.localUrl,
-      systemPrompt:
-        (config.systemPrompt || "") +
-        (config.deepSearch ? deepSearchPrompt : ""),
-    };
+    const messagesToSend = threadWithoutPending(nextThread);
+    const payload = buildPayload(messagesToSend);
 
-    await streamAssistantResponse(chatId, payload);
+    await streamAssistantResponse(chatId, payload, assistantId);
   }
 
   function threadWithoutPending(
     existing: ChatMessage[] | undefined,
-    userMsg: ChatMessage,
   ): ChatMessage[] {
-    const filtered = (existing || []).filter((m) => !m.pending);
-    return [...filtered, userMsg];
+    return (existing || []).filter((m) => !m.pending);
   }
 
-  async function streamAssistantResponse(chatId: string, payload: any) {
+  async function streamAssistantResponse(
+    chatId: string,
+    payload: any,
+    targetAssistantId?: string,
+  ) {
     try {
       const res = await fetch("/api/chat/stream", {
         method: "POST",
@@ -593,7 +667,7 @@ export default function Page() {
       });
 
       if (!res.ok || !res.body) {
-        await fallbackToSingle(chatId, payload);
+        await fallbackToSingle(chatId, payload, targetAssistantId);
         return;
       }
 
@@ -603,19 +677,21 @@ export default function Page() {
       let assembled = "";
       let finished = false;
 
-      const update = (finalize = false) => {
+      const update = (finalize = false, errorText?: string) => {
         setChats((prev) => {
           const thread = [...(prev[chatId] || [])];
-          for (let i = thread.length - 1; i >= 0; i--) {
-            const m = thread[i];
-            if (m.role === "assistant") {
-              thread[i] = {
-                role: "assistant",
-                content: assembled,
-                ...(finalize ? {} : { pending: true }),
-              };
-              break;
-            }
+          const idx =
+            targetAssistantId != null
+              ? thread.findIndex((m) => m.id === targetAssistantId)
+              : thread.length - 1;
+          if (idx >= 0 && thread[idx]?.role === "assistant") {
+            thread[idx] = {
+              ...thread[idx],
+              role: "assistant",
+              content: assembled,
+              ...(finalize ? {} : { pending: true }),
+              error: errorText,
+            };
           }
           return { ...prev, [chatId]: thread };
         });
@@ -649,11 +725,15 @@ export default function Page() {
       }
       update(true);
     } catch (_err) {
-      await fallbackToSingle(chatId, payload);
+      await fallbackToSingle(chatId, payload, targetAssistantId);
     }
   }
 
-  async function fallbackToSingle(chatId: string, payload: any) {
+  async function fallbackToSingle(
+    chatId: string,
+    payload: any,
+    targetAssistantId?: string,
+  ) {
     try {
       const r = await fetch("/api/chat", {
         method: "POST",
@@ -663,30 +743,142 @@ export default function Page() {
       const { content } = await r.json();
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
-        for (let i = thread.length - 1; i >= 0; i--) {
-          const m = thread[i];
-          if (m.role === "assistant") {
-            thread[i] = { role: "assistant", content };
-            break;
-          }
+        const idx =
+          targetAssistantId != null
+            ? thread.findIndex((m) => m.id === targetAssistantId)
+            : thread.length - 1;
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content,
+            pending: false,
+            error: undefined,
+          };
         }
         return { ...prev, [chatId]: thread };
       });
     } catch (e) {
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
-        for (let i = thread.length - 1; i >= 0; i--) {
-          const m = thread[i];
-          if (m.role === "assistant") {
-            thread[i] = {
-              role: "assistant",
-              content: `Error: ${(e as Error).message}`,
-            };
-            break;
-          }
+        const idx =
+          targetAssistantId != null
+            ? thread.findIndex((m) => m.id === targetAssistantId)
+            : thread.length - 1;
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: `Error: ${(e as Error).message}`,
+            pending: false,
+            error: (e as Error).message,
+          };
         }
         return { ...prev, [chatId]: thread };
       });
+    }
+  }
+
+  function copyMessage(msg: ChatMessage) {
+    const text = messageText(msg.content);
+    if (!text) return;
+    const id = msg.id || "copied";
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 1200);
+      })
+      .catch(() => undefined);
+  }
+
+  function startEditMessage(msg: ChatMessage) {
+    if (msg.role !== "user") return;
+    const id = msg.id || createMessageId();
+    if (!msg.id && currentChatId) {
+      setChats((prev) => {
+        const thread = [...(prev[currentChatId] || [])];
+        const idx = thread.indexOf(msg);
+        if (idx !== -1) {
+          thread[idx] = { ...thread[idx], id };
+          return { ...prev, [currentChatId]: thread };
+        }
+        return prev;
+      });
+    }
+    setEditingMessageId(id);
+    setEditDraft(messageText(msg.content));
+  }
+
+  function cancelEditMessage() {
+    setEditingMessageId(null);
+    setEditDraft("");
+  }
+
+  async function saveEditedMessage() {
+    if (!editingMessageId || !currentChatId) return;
+    const thread = chats[currentChatId] || [];
+    const userIdx = thread.findIndex((m) => m.id === editingMessageId);
+    if (userIdx === -1) return;
+
+    const pendingId = createMessageId();
+    const updatedUser: ChatMessage = {
+      ...thread[userIdx],
+      content: editDraft,
+      edited: true,
+      pending: false,
+      error: undefined,
+    };
+
+    const assistantIdx = thread.findIndex(
+      (m, idx) => idx > userIdx && m.role === "assistant",
+    );
+    let nextThread =
+      assistantIdx !== -1
+        ? thread.slice(0, assistantIdx)
+        : thread.slice(0, userIdx + 1);
+
+    nextThread[userIdx] = updatedUser;
+    nextThread = nextThread.concat({
+      role: "assistant",
+      content: "",
+      pending: true,
+      id: pendingId,
+      createdAt: Date.now(),
+    });
+
+    setChats((prev) => ({ ...prev, [currentChatId]: nextThread }));
+    setEditingMessageId(null);
+    setEditDraft("");
+
+    const messagesToSend = threadWithoutPending(nextThread);
+    const payload = buildPayload(messagesToSend);
+    await streamAssistantResponse(currentChatId, payload, pendingId);
+  }
+
+  async function regenerateAssistant(messageId: string) {
+    if (!messageId || !currentChatId) return;
+    const thread = chats[currentChatId] || [];
+    const targetIdx = thread.findIndex((m) => m.id === messageId);
+    if (targetIdx === -1) return;
+
+    const pendingId = createMessageId();
+    const nextThread = thread.slice(0, targetIdx).concat({
+      ...thread[targetIdx],
+      id: pendingId,
+      content: "",
+      pending: true,
+      error: undefined,
+    });
+
+    setChats((prev) => ({ ...prev, [currentChatId]: nextThread }));
+    setRegeneratingId(messageId);
+    const messagesToSend = threadWithoutPending(nextThread);
+    const payload = buildPayload(messagesToSend);
+    try {
+      await streamAssistantResponse(currentChatId, payload, pendingId);
+    } finally {
+      setRegeneratingId(null);
     }
   }
 
@@ -707,18 +899,24 @@ export default function Page() {
     const userMsg: ChatMessage = {
       role: "user",
       content: `[Image] Generate: ${text}`,
+      id: createMessageId(),
+      createdAt: Date.now(),
     };
+    const assistantId = createMessageId();
     const pending: ChatMessage = {
       role: "assistant",
       content: "",
       pending: true,
+      id: assistantId,
+      createdAt: Date.now(),
     };
 
-    setChats((prev) => {
-      const thread = prev[chatId] ? [...prev[chatId]] : [];
-      thread.push(userMsg, pending);
-      return { ...prev, [chatId]: thread };
-    });
+    const nextThread = (chats[chatId] ? [...chats[chatId]] : []).concat(
+      userMsg,
+      pending,
+    );
+
+    setChats((prev) => ({ ...prev, [chatId]: nextThread }));
     setSidebarOpen(false);
 
     try {
@@ -743,11 +941,15 @@ export default function Page() {
           data.error || data.details || "Image generation failed";
         setChats((prev) => {
           const thread = [...(prev[chatId] || [])];
-          for (let i = thread.length - 1; i >= 0; i--) {
-            if (thread[i].role === "assistant" && thread[i].pending) {
-              thread[i] = { role: "assistant", content: `Error: ${errorMsg}` };
-              break;
-            }
+          const idx = thread.findIndex((m) => m.id === assistantId);
+          if (idx >= 0 && thread[idx]?.role === "assistant") {
+            thread[idx] = {
+              ...thread[idx],
+              role: "assistant",
+              content: `Error: ${errorMsg}`,
+              pending: false,
+              error: errorMsg,
+            };
           }
           return { ...prev, [chatId]: thread };
         });
@@ -767,25 +969,30 @@ export default function Page() {
 
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
-        for (let i = thread.length - 1; i >= 0; i--) {
-          if (thread[i].role === "assistant" && thread[i].pending) {
-            thread[i] = { role: "assistant", content: imageContent };
-            break;
-          }
+        const idx = thread.findIndex((m) => m.id === assistantId);
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: imageContent,
+            pending: false,
+            error: undefined,
+          };
         }
         return { ...prev, [chatId]: thread };
       });
     } catch (e) {
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
-        for (let i = thread.length - 1; i >= 0; i--) {
-          if (thread[i].role === "assistant" && thread[i].pending) {
-            thread[i] = {
-              role: "assistant",
-              content: `Error: ${(e as Error).message}`,
-            };
-            break;
-          }
+        const idx = thread.findIndex((m) => m.id === assistantId);
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: `Error: ${(e as Error).message}`,
+            pending: false,
+            error: (e as Error).message,
+          };
         }
         return { ...prev, [chatId]: thread };
       });
@@ -1375,26 +1582,114 @@ export default function Page() {
             aria-live="polite"
             aria-relevant="additions"
           >
-            {thread.map((msg, idx) => (
-              <div
-                key={`${msg.role}-${idx}`}
-                className={clsx("message", msg.role)}
-              >
-                <div
-                  className={clsx("bubble", msg.role, { typing: msg.pending })}
-                >
-                  {msg.pending ? (
-                    <span className="typing-dots">
-                      <span className="dot" />
-                      <span className="dot" />
-                      <span className="dot" />
-                    </span>
-                  ) : (
-                    renderMessageContent(msg)
-                  )}
+            {thread.map((msg, idx) => {
+              const messageId = msg.id || `${currentChatId}-${idx}`;
+              const canEdit = msg.role === "user" && !msg.pending;
+              const canRegenerate = msg.role === "assistant" && !msg.pending;
+              const isEditingMessage = editingMessageId === messageId;
+              const isRegenerating = regeneratingId === messageId;
+              const isCopying = copiedId === messageId;
+              const errorText =
+                msg.error ||
+                (typeof msg.content === "string" &&
+                msg.content.toLowerCase().startsWith("error:")
+                  ? msg.content
+                  : "");
+
+              return (
+                <div key={messageId} className={clsx("message", msg.role)}>
+                  <div className="message-row">
+                    <div
+                      className={clsx("bubble", msg.role, {
+                        typing: msg.pending,
+                      })}
+                    >
+                      {msg.pending ? (
+                        <output className="typing-dots" aria-live="polite">
+                          <span className="dot" />
+                          <span className="dot" />
+                          <span className="dot" />
+                        </output>
+                      ) : isEditingMessage ? (
+                        <div className="edit-block">
+                          <textarea
+                            className="field field-textarea"
+                            ref={editInputRef}
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            rows={Math.max(3, editDraft.split("\n").length)}
+                          />
+                          <div className="edit-actions">
+                            <button
+                              type="button"
+                              className="chip primary"
+                              onClick={saveEditedMessage}
+                            >
+                              Save &amp; resend
+                            </button>
+                            <button
+                              type="button"
+                              className="chip"
+                              onClick={cancelEditMessage}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        renderMessageContent(msg)
+                      )}
+                    </div>
+                    <div className="message-actions">
+                      <button
+                        type="button"
+                        className="mini-btn ghost"
+                        title="Copy message"
+                        onClick={() => copyMessage(msg)}
+                      >
+                        {isCopying ? "Copied" : "Copy"}
+                      </button>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="mini-btn ghost"
+                          title="Edit message"
+                          onClick={() => startEditMessage(msg)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canRegenerate && (
+                        <button
+                          type="button"
+                          className="mini-btn ghost"
+                          title="Regenerate response"
+                          onClick={() => regenerateAssistant(messageId)}
+                          disabled={isRegenerating}
+                        >
+                          {isRegenerating ? "…" : "Regenerate"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {errorText ? (
+                    <div className="message-error">
+                      <div className="error-text">{errorText}</div>
+                      {canRegenerate ? (
+                        <button
+                          type="button"
+                          className="mini-btn"
+                          onClick={() => regenerateAssistant(messageId)}
+                          disabled={isRegenerating}
+                        >
+                          Retry
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
