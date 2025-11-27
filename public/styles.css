@@ -1,12 +1,25 @@
 :root {
+  --radius: 14px;
+  --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+:root {
   --bg: #0b0b0b;
   --panel: #111111;
   --panel-2: #121212;
   --border: #242424;
   --muted: #9a9a9a;
   --text: #f5f5f5;
-  --radius: 14px;
-  --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+:root.light {
+  --bg: #ffffff;
+  --panel: #f8f9fa;
+  --panel-2: #f1f3f4;
+  --border: #e0e0e0;
+  --muted: #666666;
+  --text: #1a1a1a;
+  --shadow: 0 2px 14px rgba(0, 0, 0, 0.1);
 }
 
 * {
@@ -318,15 +331,15 @@ body {
 }
 
 .chip.primary {
-  background: #f5f5f5;
-  color: #050505;
-  border-color: #f5f5f5;
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
 .chip.toggle.active {
-  background: #f5f5f5;
-  color: #050505;
-  border-color: #f5f5f5;
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
 .hero-actions {
@@ -370,9 +383,9 @@ body {
 }
 
 .bubble.user {
-  background: #ffffff;
-  color: #0a0a0a;
-  border: 1px solid #e5e5e5;
+  background: var(--text);
+  color: var(--bg);
+  border: 1px solid var(--border);
 }
 
 .bubble.assistant {
@@ -936,6 +949,16 @@ body {
   .field.field-textarea {
     min-height: 120px;
   }
+}
+
+/* Theme Toggle */
+.theme-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.theme-label {
+  font-size: 13px;
 }
 
 /* Utilities */

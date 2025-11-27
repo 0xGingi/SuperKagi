@@ -1,7 +1,22 @@
 "use client";
 
 import clsx from "clsx";
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
+
+import { exportChat } from "@/lib/export";
+import {
+  type CustomShortcuts,
+  formatShortcutDisplay,
+  isShortcutValid,
+  loadCustomShortcuts,
+  parseKeyboardEvent,
+  SHORTCUT_CONFIGS,
+  saveCustomShortcuts,
+  useKeyboardShortcuts,
+} from "@/lib/keyboard-shortcuts";
+import { useTheme } from "@/lib/theme";
 
 export type Provider = "local" | "openrouter" | "nanogpt";
 
@@ -237,6 +252,12 @@ export default function Page() {
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [imageSettingsExpanded, setImageSettingsExpanded] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"settings" | "shortcuts">(
+    "settings",
+  );
+  const [customShortcuts, setCustomShortcuts] = useState<CustomShortcuts>({});
+  const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
+  const [recordingKey, setRecordingKey] = useState<string>("");
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -391,6 +412,67 @@ export default function Page() {
       );
     }
   }, [config.provider, nanoModelsStatus]);
+
+  // Load custom shortcuts
+  useEffect(() => {
+    const loaded = loadCustomShortcuts();
+    setCustomShortcuts(loaded);
+  }, []);
+
+  // Merge custom shortcuts with defaults
+  const activeShortcuts = useMemo(() => {
+    const merged: Record<string, string> = {};
+    SHORTCUT_CONFIGS.forEach((config) => {
+      const key = customShortcuts[config.action] || config.defaultKey;
+      merged[key] = config.action;
+    });
+    return merged;
+  }, [customShortcuts]);
+
+  // Keyboard shortcuts
+  const { setTheme, theme } = useTheme();
+
+  // Create shortcut handlers map
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Functions are stable and defined below
+  const shortcutHandlers: Record<string, () => void> = useMemo(
+    () => ({
+      NEW_CHAT: newChat,
+      TOGGLE_SIDEBAR: handleSidebarToggle,
+      TOGGLE_CONFIG: () => setShowConfig(!showConfig),
+      TOGGLE_DEEP_SEARCH: toggleDeepSearch,
+      FOCUS_SEARCH: () => {
+        const searchInput = document.getElementById(
+          "chat-search",
+        ) as HTMLInputElement;
+        searchInput?.focus();
+      },
+      TOGGLE_THEME: () => {
+        setTheme(
+          theme === "dark" ? "light" : theme === "light" ? "dark" : "system",
+        );
+      },
+      EXPORT_CHAT: () => {
+        const currentThread = chats[currentChatId] || [];
+        if (currentThread.length > 0) {
+          exportChat(currentChatId, currentThread, "markdown");
+        }
+      },
+    }),
+    [theme, setTheme, showConfig, currentChatId, chats],
+  );
+
+  // Build the actual shortcuts object for useKeyboardShortcuts
+  const shortcuts = useMemo(() => {
+    const result: Record<string, () => void> = {};
+    Object.entries(activeShortcuts).forEach(([key, action]) => {
+      if (shortcutHandlers[action]) {
+        result[key] = shortcutHandlers[action];
+      }
+    });
+    return result;
+  }, [activeShortcuts, shortcutHandlers]);
+
+  useKeyboardShortcuts(shortcuts);
 
   function handleSidebarToggle() {
     if (window.innerWidth <= 780) {
@@ -751,21 +833,35 @@ export default function Page() {
 
   function renderMessageContent(msg: ChatMessage) {
     if (Array.isArray(msg.content)) {
-      const html = msg.content
-        .map((part) => {
-          if (part.type === "image_url") {
-            return `<img src="${part.image_url.url}" alt="image" />`;
-          }
-          return renderMD(part.text || "");
-        })
-        .join("");
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: rendering markdown content
-      return <div dangerouslySetInnerHTML={{ __html: html }} />;
+      const textParts = msg.content
+        .filter((part) => part.type === "text")
+        .map((part) => part.text || "")
+        .join("\n");
+
+      const imageParts = msg.content.filter(
+        (part) => part.type === "image_url",
+      );
+
+      return (
+        <div>
+          {textParts && <MarkdownRenderer content={textParts} />}
+          {imageParts.map((part) => (
+            <Image
+              key={part.image_url.url}
+              src={part.image_url.url}
+              alt="Generated content"
+              className="markdown-image"
+              unoptimized
+              width={1024}
+              height={1024}
+              style={{ width: "100%", height: "auto" }}
+            />
+          ))}
+        </div>
+      );
     }
-    return (
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: rendering markdown content
-      <div dangerouslySetInnerHTML={{ __html: renderMD(msg.content || "") }} />
-    );
+
+    return <MarkdownRenderer content={msg.content || ""} />;
   }
 
   function toggleDeepSearch() {
@@ -1103,6 +1199,33 @@ export default function Page() {
             </svg>
             Config
           </button>
+          <button
+            type="button"
+            className="chip w-full"
+            onClick={() => {
+              if (thread.length > 0) {
+                exportChat(currentChatId, thread, "markdown");
+              }
+            }}
+            title="Export current chat"
+            aria-label="Export current chat"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7,10 12,15 17,10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export
+          </button>
         </nav>
         <h3 className="section-title">Chats</h3>
         <ul className="chat-list" id="chat-list">
@@ -1236,6 +1359,7 @@ export default function Page() {
               >
                 DeepSearch
               </button>
+
               <button
                 type="button"
                 className="chip"
@@ -1316,6 +1440,7 @@ export default function Page() {
               >
                 DeepSearch
               </button>
+
               {config.provider === "nanogpt" && (
                 <button
                   type="button"
@@ -1381,541 +1506,780 @@ export default function Page() {
             </header>
             <div className="settings-body">
               <aside className="settings-nav">
-                <button type="button" className="nav-item active">
+                <button
+                  type="button"
+                  className={clsx("nav-item", {
+                    active: settingsTab === "settings",
+                  })}
+                  onClick={() => setSettingsTab("settings")}
+                >
                   <span className="dot" /> Settings
+                </button>
+                <button
+                  type="button"
+                  className={clsx("nav-item", {
+                    active: settingsTab === "shortcuts",
+                  })}
+                  onClick={() => setSettingsTab("shortcuts")}
+                >
+                  <span className="dot" /> Keyboard Shortcuts
                 </button>
               </aside>
               <section className="settings-main">
-                <div className="section">
-                  <div className="section-title">Connections</div>
-
-                  <div className="settings-row">
-                    <div className="row-label">Provider</div>
-                    <div className="row-content">
-                      <div className="segmented" id="provider-seg">
-                        <button
-                          type="button"
-                          className={clsx("seg", {
-                            active: config.provider === "local",
-                          })}
-                          onClick={() => setProvider("local")}
-                        >
-                          Local
-                        </button>
-                        <button
-                          type="button"
-                          className={clsx("seg", {
-                            active: config.provider === "openrouter",
-                          })}
-                          onClick={() => setProvider("openrouter")}
-                        >
-                          OpenRouter
-                        </button>
-                        <button
-                          type="button"
-                          className={clsx("seg", {
-                            active: config.provider === "nanogpt",
-                          })}
-                          onClick={() => setProvider("nanogpt")}
-                        >
-                          NanoGPT
-                        </button>
+                {settingsTab === "settings" ? (
+                  <div className="section">
+                    <div className="section-title">Appearance</div>
+                    <div className="settings-row">
+                      <div className="row-label">Theme</div>
+                      <div className="row-content">
+                        <div className="segmented">
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: theme === "system",
+                            })}
+                            onClick={() => setTheme("system")}
+                          >
+                            System
+                          </button>
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: theme === "dark",
+                            })}
+                            onClick={() => setTheme("dark")}
+                          >
+                            Dark
+                          </button>
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: theme === "light",
+                            })}
+                            onClick={() => setTheme("light")}
+                          >
+                            Light
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="settings-row">
-                    <div className="row-label">Model</div>
-                    <div
-                      className="row-content"
-                      style={{
-                        flexDirection: "column",
-                        alignItems: "stretch",
-                        gap: "10px",
-                      }}
-                    >
+                    <div className="section-title">Connections</div>
+
+                    <div className="settings-row">
+                      <div className="row-label">Provider</div>
+                      <div className="row-content">
+                        <div className="segmented" id="provider-seg">
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: config.provider === "local",
+                            })}
+                            onClick={() => setProvider("local")}
+                          >
+                            Local
+                          </button>
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: config.provider === "openrouter",
+                            })}
+                            onClick={() => setProvider("openrouter")}
+                          >
+                            OpenRouter
+                          </button>
+                          <button
+                            type="button"
+                            className={clsx("seg", {
+                              active: config.provider === "nanogpt",
+                            })}
+                            onClick={() => setProvider("nanogpt")}
+                          >
+                            NanoGPT
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <div className="row-label">Model</div>
                       <div
+                        className="row-content"
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
+                          flexDirection: "column",
+                          alignItems: "stretch",
+                          gap: "10px",
                         }}
                       >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <input
+                            className="field"
+                            id="model"
+                            value={
+                              config.models?.[config.provider] ||
+                              config.model ||
+                              ""
+                            }
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                models: {
+                                  ...prev.models,
+                                  [prev.provider]: e.target.value,
+                                },
+                                model: e.target.value,
+                              }))
+                            }
+                            placeholder="e.g., openrouter/auto"
+                            autoComplete="off"
+                          />
+                          {config.provider === "nanogpt" && (
+                            <button
+                              type="button"
+                              className="mini-btn"
+                              onClick={fetchNanoModels}
+                              disabled={nanoModelsLoading}
+                            >
+                              {nanoModelsLoading ? "Fetching…" : "Load models"}
+                            </button>
+                          )}
+                        </div>
+
+                        {config.provider === "nanogpt" && (
+                          <div className="nano-models">
+                            <div className="nano-status">
+                              {nanoModelsStatus ||
+                                "Uses your NanoGPT API key to load subscription models."}
+                            </div>
+                            <div className="nano-model-actions">
+                              <input
+                                className="field"
+                                id="nanogpt-model-search"
+                                placeholder="Filter NanoGPT models"
+                                value={nanoModelQuery}
+                                onChange={(e) =>
+                                  setNanoModelQuery(e.target.value)
+                                }
+                                autoComplete="off"
+                              />
+                              <button
+                                type="button"
+                                className="mini-btn"
+                                onClick={() => setNanoModelQuery("")}
+                                disabled={!nanoModelQuery}
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            <div className="nano-model-list">
+                              {filteredNanoModels.length ? (
+                                filteredNanoModels.map((m) => (
+                                  <button
+                                    type="button"
+                                    key={m.id}
+                                    className={clsx("model-pill", {
+                                      active:
+                                        (config.models?.nanogpt ||
+                                          config.model) === m.id,
+                                    })}
+                                    onClick={() => applyNanoModel(m.id)}
+                                    title={m.label}
+                                  >
+                                    <span className="label">{m.id}</span>
+                                    {m.pricing ? (
+                                      <span className="meta">{m.pricing}</span>
+                                    ) : null}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="nano-status">
+                                  No models loaded yet.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      className="settings-row"
+                      style={{
+                        display:
+                          config.provider === "openrouter" ||
+                          config.provider === "nanogpt"
+                            ? "grid"
+                            : "none",
+                      }}
+                    >
+                      <div className="row-label">API Key</div>
+                      <div className="row-content">
                         <input
                           className="field"
-                          id="model"
-                          value={
-                            config.models?.[config.provider] ||
-                            config.model ||
-                            ""
+                          id="api-key"
+                          type="password"
+                          value={config.apiKey || ""}
+                          placeholder={
+                            config.provider === "openrouter"
+                              ? serverDefaults.hasApiKey && !config.apiKey
+                                ? "Using server default"
+                                : ""
+                              : config.provider === "nanogpt" &&
+                                  serverDefaults.hasNanoApiKey &&
+                                  !config.apiKey
+                                ? "Using server default"
+                                : ""
                           }
                           onChange={(e) =>
                             setConfig((prev) => ({
                               ...prev,
-                              models: {
-                                ...prev.models,
-                                [prev.provider]: e.target.value,
-                              },
-                              model: e.target.value,
+                              apiKey: e.target.value,
                             }))
                           }
-                          placeholder="e.g., openrouter/auto"
                           autoComplete="off"
                         />
-                        {config.provider === "nanogpt" && (
+                        <div className="row-helpers">
                           <button
                             type="button"
                             className="mini-btn"
-                            onClick={fetchNanoModels}
-                            disabled={nanoModelsLoading}
+                            onClick={() => {
+                              const el = document.getElementById(
+                                "api-key",
+                              ) as HTMLInputElement | null;
+                              if (!el) return;
+                              el.type =
+                                el.type === "password" ? "text" : "password";
+                            }}
                           >
-                            {nanoModelsLoading ? "Fetching…" : "Load models"}
+                            Show
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            className="mini-btn"
+                            onClick={() =>
+                              navigator.clipboard
+                                .writeText(config.apiKey || "")
+                                .catch(() => undefined)
+                            }
+                          >
+                            Copy
+                          </button>
+                        </div>
                       </div>
+                    </div>
 
-                      {config.provider === "nanogpt" && (
+                    <div
+                      className="settings-row"
+                      style={{
+                        display: config.provider === "local" ? "grid" : "none",
+                      }}
+                    >
+                      <div className="row-label">Local URL</div>
+                      <div className="row-content">
+                        <input
+                          className="field"
+                          id="local-url"
+                          value={config.localUrl}
+                          onChange={(e) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              localUrl: e.target.value,
+                            }))
+                          }
+                          autoComplete="off"
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="settings-row"
+                      style={{
+                        display:
+                          config.provider === "nanogpt" ? "grid" : "none",
+                      }}
+                    >
+                      <div className="row-label">Image Model</div>
+                      <div
+                        className="row-content"
+                        style={{
+                          flexDirection: "column",
+                          alignItems: "stretch",
+                          gap: "10px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <input
+                            className="field"
+                            id="image-model"
+                            value={config.imageModel || ""}
+                            onChange={(e) =>
+                              setConfig((prev) => ({
+                                ...prev,
+                                imageModel: e.target.value,
+                              }))
+                            }
+                            placeholder="e.g., chroma, hidream"
+                            autoComplete="off"
+                          />
+                        </div>
                         <div className="nano-models">
                           <div className="nano-status">
-                            {nanoModelsStatus ||
-                              "Uses your NanoGPT API key to load subscription models."}
-                          </div>
-                          <div className="nano-model-actions">
-                            <input
-                              className="field"
-                              id="nanogpt-model-search"
-                              placeholder="Filter NanoGPT models"
-                              value={nanoModelQuery}
-                              onChange={(e) =>
-                                setNanoModelQuery(e.target.value)
-                              }
-                              autoComplete="off"
-                            />
-                            <button
-                              type="button"
-                              className="mini-btn"
-                              onClick={() => setNanoModelQuery("")}
-                              disabled={!nanoModelQuery}
-                            >
-                              Clear
-                            </button>
+                            Available image models for IMG button:
                           </div>
                           <div className="nano-model-list">
-                            {filteredNanoModels.length ? (
-                              filteredNanoModels.map((m) => (
+                            {nanoImageModels.map((m) => (
+                              <button
+                                type="button"
+                                key={m.id}
+                                className={clsx("model-pill", {
+                                  active: config.imageModel === m.id,
+                                })}
+                                onClick={() =>
+                                  setConfig((prev) => ({
+                                    ...prev,
+                                    imageModel: m.id,
+                                  }))
+                                }
+                                title={`${m.name} - ${m.resolutions.join(", ")}`}
+                              >
+                                <span className="label">{m.name}</span>
+                                <span className="meta">{m.pricing}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="settings-row"
+                      style={{
+                        display:
+                          config.provider === "nanogpt" ? "grid" : "none",
+                      }}
+                    >
+                      <div className="row-label">
+                        <button
+                          type="button"
+                          className="expand-toggle"
+                          onClick={() =>
+                            setImageSettingsExpanded(!imageSettingsExpanded)
+                          }
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--text)",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: 0,
+                            width: "100%",
+                            textAlign: "left",
+                          }}
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{
+                              transform: imageSettingsExpanded
+                                ? "rotate(90deg)"
+                                : "rotate(0deg)",
+                              transition: "transform 0.2s ease",
+                            }}
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                          Image Generation Settings
+                        </button>
+                      </div>
+                      <div className="row-content">
+                        <div
+                          style={{ fontSize: "12px", color: "var(--muted)" }}
+                        >
+                          Configure size, steps, and other parameters
+                        </div>
+                      </div>
+                    </div>
+
+                    {imageSettingsExpanded && config.provider === "nanogpt" && (
+                      <>
+                        <div className="settings-row image-setting">
+                          <div className="row-label">Image Size</div>
+                          <div className="row-content">
+                            <select
+                              className="field"
+                              value={config.imageSize}
+                              onChange={(e) =>
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  imageSize: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="256x256">256x256</option>
+                              <option value="512x512">512x512</option>
+                              <option value="768x1024">
+                                768x1024 (Portrait)
+                              </option>
+                              <option value="576x1024">
+                                576x1024 (Portrait 9:16)
+                              </option>
+                              <option value="1024x768">
+                                1024x768 (Landscape)
+                              </option>
+                              <option value="1024x576">
+                                1024x576 (Landscape 16:9)
+                              </option>
+                              <option value="1024x1024">
+                                1024x1024 (Square)
+                              </option>
+                              <option value="1920x1088">
+                                1920x1088 (Landscape HD)
+                              </option>
+                              <option value="1088x1920">
+                                1088x1920 (Portrait HD)
+                              </option>
+                              <option value="1408x1024">
+                                1408x1024 (Landscape Wide)
+                              </option>
+                              <option value="1024x1408">
+                                1024x1408 (Portrait Tall)
+                              </option>
+                              <option value="2048x2048">
+                                2048x2048 (Large Square)
+                              </option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="settings-row image-setting">
+                          <div className="row-label">Steps</div>
+                          <div className="row-content">
+                            <input
+                              type="number"
+                              className="field"
+                              min="1"
+                              max="100"
+                              value={config.imageSteps}
+                              onChange={(e) =>
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  imageSteps:
+                                    parseInt(e.target.value, 10) || 30,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="settings-row image-setting">
+                          <div className="row-label">Guidance Scale</div>
+                          <div className="row-content">
+                            <input
+                              type="number"
+                              className="field"
+                              min="0"
+                              max="20"
+                              step="0.1"
+                              value={config.imageGuidanceScale}
+                              onChange={(e) =>
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  imageGuidanceScale:
+                                    parseFloat(e.target.value) || 7.5,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="settings-row image-setting">
+                          <div className="row-label">Seed (Optional)</div>
+                          <div className="row-content">
+                            <input
+                              type="number"
+                              className="field"
+                              min="0"
+                              placeholder="Random"
+                              value={config.imageSeed || ""}
+                              onChange={(e) =>
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  imageSeed: e.target.value
+                                    ? parseInt(e.target.value, 10)
+                                    : undefined,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="settings-row">
+                      <div className="row-label">System Prompt</div>
+                      <div className="row-content">
+                        <textarea
+                          className="field field-textarea"
+                          id="system-prompt"
+                          value={config.systemPrompt}
+                          onChange={(e) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              systemPrompt: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      id="config-status"
+                      className={clsx("config-status", {
+                        ok: statusMsg?.ok,
+                        err: statusMsg?.ok === false,
+                      })}
+                    >
+                      {statusMsg?.text}
+                    </div>
+
+                    <div className="settings-actions">
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={resetToDefaults}
+                        title="Reset settings to server defaults"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={testConnection}
+                        disabled={isTesting}
+                      >
+                        Test Connection
+                      </button>
+                      <div style={{ flex: 1 }} />
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={() => setShowConfig(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="chip primary"
+                        onClick={saveConfigFromModal}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="section">
+                    <div className="section-title">Keyboard Shortcuts</div>
+                    <div
+                      style={{
+                        marginBottom: "20px",
+                        color: "var(--muted)",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Click on a shortcut to record a new key combination.
+                    </div>
+
+                    {SHORTCUT_CONFIGS.map((config) => {
+                      const currentKey =
+                        customShortcuts[config.action] || config.defaultKey;
+                      const isEditing = editingShortcut === config.action;
+                      const hasConflict =
+                        recordingKey &&
+                        isEditing &&
+                        SHORTCUT_CONFIGS.some(
+                          (c) =>
+                            c.action !== config.action &&
+                            (customShortcuts[c.action] || c.defaultKey) ===
+                              recordingKey,
+                        );
+
+                      return (
+                        <div
+                          key={config.action}
+                          className="settings-row"
+                          style={{ alignItems: "center" }}
+                        >
+                          <div className="row-label">{config.label}</div>
+                          <div className="row-content">
+                            {isEditing ? (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "8px",
+                                }}
+                              >
+                                <input
+                                  className="field"
+                                  value={
+                                    recordingKey
+                                      ? formatShortcutDisplay(recordingKey)
+                                      : "Press a key combination..."
+                                  }
+                                  readOnly
+                                  style={{
+                                    cursor: "pointer",
+                                    background: hasConflict
+                                      ? "var(--error-bg, #fee)"
+                                      : "var(--input-bg)",
+                                  }}
+                                  onKeyDown={(e) => {
+                                    e.preventDefault();
+                                    const parsed = parseKeyboardEvent(
+                                      e.nativeEvent,
+                                    );
+                                    if (parsed) {
+                                      setRecordingKey(parsed);
+                                    }
+                                  }}
+                                />
+                                {hasConflict && (
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "var(--error, #c00)",
+                                    }}
+                                  >
+                                    This shortcut is already in use
+                                  </div>
+                                )}
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                  <button
+                                    type="button"
+                                    className="mini-btn"
+                                    onClick={() => {
+                                      if (
+                                        recordingKey &&
+                                        isShortcutValid(recordingKey) &&
+                                        !hasConflict
+                                      ) {
+                                        setCustomShortcuts((prev) => ({
+                                          ...prev,
+                                          [config.action]: recordingKey,
+                                        }));
+                                        saveCustomShortcuts({
+                                          ...customShortcuts,
+                                          [config.action]: recordingKey,
+                                        });
+                                      }
+                                      setEditingShortcut(null);
+                                      setRecordingKey("");
+                                    }}
+                                    disabled={!recordingKey || !!hasConflict}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="mini-btn"
+                                    onClick={() => {
+                                      setEditingShortcut(null);
+                                      setRecordingKey("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "10px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontFamily: "monospace",
+                                    padding: "8px 12px",
+                                    background: "var(--input-bg)",
+                                    borderRadius: "6px",
+                                    fontSize: "14px",
+                                    minWidth: "120px",
+                                  }}
+                                >
+                                  {formatShortcutDisplay(currentKey)}
+                                </div>
                                 <button
                                   type="button"
-                                  key={m.id}
-                                  className={clsx("model-pill", {
-                                    active:
-                                      (config.models?.nanogpt ||
-                                        config.model) === m.id,
-                                  })}
-                                  onClick={() => applyNanoModel(m.id)}
-                                  title={m.label}
+                                  className="mini-btn"
+                                  onClick={() => {
+                                    setEditingShortcut(config.action);
+                                    setRecordingKey("");
+                                  }}
                                 >
-                                  <span className="label">{m.id}</span>
-                                  {m.pricing ? (
-                                    <span className="meta">{m.pricing}</span>
-                                  ) : null}
+                                  Edit
                                 </button>
-                              ))
-                            ) : (
-                              <div className="nano-status">
-                                No models loaded yet.
+                                {customShortcuts[config.action] && (
+                                  <button
+                                    type="button"
+                                    className="mini-btn"
+                                    onClick={() => {
+                                      const updated = { ...customShortcuts };
+                                      delete updated[config.action];
+                                      setCustomShortcuts(updated);
+                                      saveCustomShortcuts(updated);
+                                    }}
+                                  >
+                                    Reset
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      );
+                    })}
 
-                  <div
-                    className="settings-row"
-                    style={{
-                      display:
-                        config.provider === "openrouter" ||
-                        config.provider === "nanogpt"
-                          ? "grid"
-                          : "none",
-                    }}
-                  >
-                    <div className="row-label">API Key</div>
-                    <div className="row-content">
-                      <input
-                        className="field"
-                        id="api-key"
-                        type="password"
-                        value={config.apiKey || ""}
-                        placeholder={
-                          config.provider === "openrouter"
-                            ? serverDefaults.hasApiKey && !config.apiKey
-                              ? "Using server default"
-                              : ""
-                            : config.provider === "nanogpt" &&
-                                serverDefaults.hasNanoApiKey &&
-                                !config.apiKey
-                              ? "Using server default"
-                              : ""
-                        }
-                        onChange={(e) =>
-                          setConfig((prev) => ({
-                            ...prev,
-                            apiKey: e.target.value,
-                          }))
-                        }
-                        autoComplete="off"
-                      />
-                      <div className="row-helpers">
-                        <button
-                          type="button"
-                          className="mini-btn"
-                          onClick={() => {
-                            const el = document.getElementById(
-                              "api-key",
-                            ) as HTMLInputElement | null;
-                            if (!el) return;
-                            el.type =
-                              el.type === "password" ? "text" : "password";
-                          }}
-                        >
-                          Show
-                        </button>
-                        <button
-                          type="button"
-                          className="mini-btn"
-                          onClick={() =>
-                            navigator.clipboard
-                              .writeText(config.apiKey || "")
-                              .catch(() => undefined)
-                          }
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="settings-row"
-                    style={{
-                      display: config.provider === "local" ? "grid" : "none",
-                    }}
-                  >
-                    <div className="row-label">Local URL</div>
-                    <div className="row-content">
-                      <input
-                        className="field"
-                        id="local-url"
-                        value={config.localUrl}
-                        onChange={(e) =>
-                          setConfig((prev) => ({
-                            ...prev,
-                            localUrl: e.target.value,
-                          }))
-                        }
-                        autoComplete="off"
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    className="settings-row"
-                    style={{
-                      display: config.provider === "nanogpt" ? "grid" : "none",
-                    }}
-                  >
-                    <div className="row-label">Image Model</div>
-                    <div
-                      className="row-content"
-                      style={{
-                        flexDirection: "column",
-                        alignItems: "stretch",
-                        gap: "10px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                        }}
-                      >
-                        <input
-                          className="field"
-                          id="image-model"
-                          value={config.imageModel || ""}
-                          onChange={(e) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              imageModel: e.target.value,
-                            }))
-                          }
-                          placeholder="e.g., chroma, hidream"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="nano-models">
-                        <div className="nano-status">
-                          Available image models for IMG button:
-                        </div>
-                        <div className="nano-model-list">
-                          {nanoImageModels.map((m) => (
-                            <button
-                              type="button"
-                              key={m.id}
-                              className={clsx("model-pill", {
-                                active: config.imageModel === m.id,
-                              })}
-                              onClick={() =>
-                                setConfig((prev) => ({
-                                  ...prev,
-                                  imageModel: m.id,
-                                }))
-                              }
-                              title={`${m.name} - ${m.resolutions.join(", ")}`}
-                            >
-                              <span className="label">{m.name}</span>
-                              <span className="meta">{m.pricing}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="settings-row"
-                    style={{
-                      display: config.provider === "nanogpt" ? "grid" : "none",
-                    }}
-                  >
-                    <div className="row-label">
+                    <div style={{ marginTop: "20px" }}>
                       <button
                         type="button"
-                        className="expand-toggle"
-                        onClick={() =>
-                          setImageSettingsExpanded(!imageSettingsExpanded)
-                        }
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "var(--text)",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: "600",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: 0,
-                          width: "100%",
-                          textAlign: "left",
+                        className="chip"
+                        onClick={() => {
+                          setCustomShortcuts({});
+                          saveCustomShortcuts({});
+                          setEditingShortcut(null);
+                          setRecordingKey("");
                         }}
                       >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            transform: imageSettingsExpanded
-                              ? "rotate(90deg)"
-                              : "rotate(0deg)",
-                            transition: "transform 0.2s ease",
-                          }}
-                        >
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                        Image Generation Settings
+                        Reset All to Defaults
                       </button>
                     </div>
-                    <div className="row-content">
-                      <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                        Configure size, steps, and other parameters
-                      </div>
-                    </div>
                   </div>
-
-                  {imageSettingsExpanded && config.provider === "nanogpt" && (
-                    <>
-                      <div className="settings-row image-setting">
-                        <div className="row-label">Image Size</div>
-                        <div className="row-content">
-                          <select
-                            className="field"
-                            value={config.imageSize}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                imageSize: e.target.value,
-                              }))
-                            }
-                          >
-                            <option value="256x256">256x256</option>
-                            <option value="512x512">512x512</option>
-                            <option value="768x1024">
-                              768x1024 (Portrait)
-                            </option>
-                            <option value="576x1024">
-                              576x1024 (Portrait 9:16)
-                            </option>
-                            <option value="1024x768">
-                              1024x768 (Landscape)
-                            </option>
-                            <option value="1024x576">
-                              1024x576 (Landscape 16:9)
-                            </option>
-                            <option value="1024x1024">
-                              1024x1024 (Square)
-                            </option>
-                            <option value="1920x1088">
-                              1920x1088 (Landscape HD)
-                            </option>
-                            <option value="1088x1920">
-                              1088x1920 (Portrait HD)
-                            </option>
-                            <option value="1408x1024">
-                              1408x1024 (Landscape Wide)
-                            </option>
-                            <option value="1024x1408">
-                              1024x1408 (Portrait Tall)
-                            </option>
-                            <option value="2048x2048">
-                              2048x2048 (Large Square)
-                            </option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="settings-row image-setting">
-                        <div className="row-label">Steps</div>
-                        <div className="row-content">
-                          <input
-                            type="number"
-                            className="field"
-                            min="1"
-                            max="100"
-                            value={config.imageSteps}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                imageSteps: parseInt(e.target.value, 10) || 30,
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="settings-row image-setting">
-                        <div className="row-label">Guidance Scale</div>
-                        <div className="row-content">
-                          <input
-                            type="number"
-                            className="field"
-                            min="0"
-                            max="20"
-                            step="0.1"
-                            value={config.imageGuidanceScale}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                imageGuidanceScale:
-                                  parseFloat(e.target.value) || 7.5,
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="settings-row image-setting">
-                        <div className="row-label">Seed (Optional)</div>
-                        <div className="row-content">
-                          <input
-                            type="number"
-                            className="field"
-                            min="0"
-                            placeholder="Random"
-                            value={config.imageSeed || ""}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                imageSeed: e.target.value
-                                  ? parseInt(e.target.value, 10)
-                                  : undefined,
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="settings-row">
-                    <div className="row-label">System Prompt</div>
-                    <div className="row-content">
-                      <textarea
-                        className="field field-textarea"
-                        id="system-prompt"
-                        value={config.systemPrompt}
-                        onChange={(e) =>
-                          setConfig((prev) => ({
-                            ...prev,
-                            systemPrompt: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    id="config-status"
-                    className={clsx("config-status", {
-                      ok: statusMsg?.ok,
-                      err: statusMsg?.ok === false,
-                    })}
-                  >
-                    {statusMsg?.text}
-                  </div>
-
-                  <div className="settings-actions">
-                    <button
-                      type="button"
-                      className="chip"
-                      onClick={resetToDefaults}
-                      title="Reset settings to server defaults"
-                    >
-                      Reset
-                    </button>
-                    <button
-                      type="button"
-                      className="chip"
-                      onClick={testConnection}
-                      disabled={isTesting}
-                    >
-                      Test Connection
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    <button
-                      type="button"
-                      className="chip"
-                      onClick={() => setShowConfig(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="chip primary"
-                      onClick={saveConfigFromModal}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
+                )}
               </section>
             </div>
           </div>
@@ -2043,118 +2407,6 @@ async function optimizeImage(dataUrl: string, maxDim = 1600, quality = 0.85) {
   } catch {
     return dataUrl;
   }
-}
-
-function renderMD(text: string) {
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  function renderInline(segment: string) {
-    const linkRE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-    let out = "";
-    let last = 0;
-    let m: RegExpExecArray | null;
-    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex loop pattern
-    while ((m = linkRE.exec(segment)) !== null) {
-      out += esc(segment.slice(last, m.index));
-      const t = esc(m[1]);
-      const u = esc(m[2]);
-      out += `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`;
-      last = m.index + m[0].length;
-    }
-    out += esc(segment.slice(last));
-    out = out
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/`([^`]+?)`/g, "<code>$1</code>");
-    out = out.replace(/&lt;br\/?&gt;/g, "<br/>");
-    return out;
-  }
-
-  function renderBlock(blockText: string) {
-    const lines = blockText.replace(/\r\n/g, "\n").split("\n");
-    let html = "";
-    let inList = false;
-    const closeList = () => {
-      if (inList) {
-        html += "</ul>";
-        inList = false;
-      }
-    };
-
-    const splitCells = (line: string) => {
-      const trimmed = line.replace(/^\s*\|/, "").replace(/\|\s*$/, "");
-      return trimmed.split("|");
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const raw = lines[i];
-      const line = raw.trimEnd();
-      if (!line.trim()) {
-        closeList();
-        continue;
-      }
-      if (line.startsWith("|")) {
-        const next = (lines[i + 1] || "").trim();
-        if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next)) {
-          const headers = splitCells(line);
-          i++;
-          closeList();
-          html +=
-            '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
-          headers.forEach((h) => {
-            html += `<th>${renderInline(h.trim())}</th>`;
-          });
-          html += "</tr></thead><tbody>";
-          while (i + 1 < lines.length && lines[i + 1].trim().startsWith("|")) {
-            i++;
-            const cells = splitCells(lines[i].trim());
-            html += "<tr>";
-            for (let c = 0; c < headers.length; c++) {
-              html += `<td>${renderInline((cells[c] || "").trim())}</td>`;
-            }
-            html += "</tr>";
-          }
-          html += "</tbody></table></div>";
-          continue;
-        }
-      }
-      const h = line.match(/^#{1,6}\s+(.*)$/);
-      if (h) {
-        closeList();
-        const level = Math.min(6, line.indexOf(" "));
-        html += `<h${level}>${renderInline(h[1])}</h${level}>`;
-        continue;
-      }
-      const li = line.match(/^[-*]\s+(.*)$/);
-      if (li) {
-        if (!inList) {
-          html += "<ul>";
-          inList = true;
-        }
-        html += `<li>${renderInline(li[1])}</li>`;
-        continue;
-      }
-      closeList();
-      html += `<p>${renderInline(line)}</p>`;
-    }
-    closeList();
-    return html;
-  }
-
-  let html = "";
-  const parts = (text || "").split(/```/);
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      html += renderBlock(parts[i]);
-    } else {
-      const seg = parts[i];
-      const nl = seg.indexOf("\n");
-      const lang = nl === -1 ? "" : seg.slice(0, nl).trim();
-      const code = nl === -1 ? seg : seg.slice(nl + 1);
-      html += `<pre><code class="lang-${esc(lang)}">${esc(code)}</code></pre>`;
-    }
-  }
-  return html;
 }
 
 function safeParseLocal<T>(key: string): T | null {
