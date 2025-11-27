@@ -288,6 +288,7 @@ export default function Page() {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
+  const [messageSearch, setMessageSearch] = useState("");
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -529,6 +530,11 @@ export default function Page() {
 
   useKeyboardShortcuts(shortcuts);
 
+  useEffect(() => {
+    if (!editingMessageId) return;
+    editInputRef.current?.focus();
+  }, [editingMessageId]);
+
   function handleSidebarToggle() {
     if (window.innerWidth <= 780) {
       setSidebarOpen((v) => !v);
@@ -548,6 +554,28 @@ export default function Page() {
     [chats, currentChatId],
   );
   const isEmpty = thread.length === 0;
+
+  const visibleThread = useMemo(() => {
+    const q = messageSearch.trim().toLowerCase();
+    if (!q) return thread;
+    return thread.filter((m) =>
+      messageText(m.content).toLowerCase().includes(q),
+    );
+  }, [thread, messageSearch]);
+
+  const searchActive = !!messageSearch.trim();
+
+  function formatMessageTime(msg: ChatMessage) {
+    const ts =
+      msg.createdAt ||
+      (currentChatId ? parseInt(currentChatId, 10) : Date.now());
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  const totalCount = thread.length;
+  const visibleCount = visibleThread.length;
 
   function _focusActiveInput() {
     const useComposer = !isEmpty;
@@ -577,6 +605,7 @@ export default function Page() {
       systemPrompt:
         (config.systemPrompt || "") +
         (config.deepSearch ? deepSearchPrompt : ""),
+      deepSearch: config.deepSearch,
     };
   }
 
@@ -659,11 +688,14 @@ export default function Page() {
     payload: any,
     targetAssistantId?: string,
   ) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -689,7 +721,7 @@ export default function Page() {
               ...thread[idx],
               role: "assistant",
               content: assembled,
-              ...(finalize ? {} : { pending: true }),
+              pending: !finalize,
               error: errorText,
             };
           }
@@ -715,6 +747,11 @@ export default function Page() {
           }
           try {
             const data = JSON.parse(payloadLine);
+            if (data?.error) {
+              update(true, data.error);
+              await fallbackToSingle(chatId, payload, targetAssistantId);
+              return;
+            }
             if (typeof data.content === "string") {
               assembled += data.content;
               update(false);
@@ -726,6 +763,8 @@ export default function Page() {
       update(true);
     } catch (_err) {
       await fallbackToSingle(chatId, payload, targetAssistantId);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -1581,8 +1620,53 @@ export default function Page() {
             className="chat-area"
             aria-live="polite"
             aria-relevant="additions"
+            style={{ display: isEmpty ? "none" : undefined }}
           >
-            {thread.map((msg, idx) => {
+            {!isEmpty ? (
+              <div className="thread-toolbar">
+                <div className="thread-search">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.3-4.3" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search in this chat"
+                    value={messageSearch}
+                    onChange={(e) => setMessageSearch(e.target.value)}
+                  />
+                  {messageSearch ? (
+                    <button
+                      type="button"
+                      className="mini-btn ghost"
+                      onClick={() => setMessageSearch("")}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <div className="thread-meta">
+                  {searchActive
+                    ? `${visibleCount}/${totalCount} matches`
+                    : `${totalCount} messages`}
+                </div>
+              </div>
+            ) : null}
+            {searchActive && !visibleThread.length ? (
+              <div className="search-empty">
+                No messages match “{messageSearch.trim()}”.
+              </div>
+            ) : null}
+            {visibleThread.map((msg, idx) => {
               const messageId = msg.id || `${currentChatId}-${idx}`;
               const canEdit = msg.role === "user" && !msg.pending;
               const canRegenerate = msg.role === "assistant" && !msg.pending;
@@ -1670,6 +1754,10 @@ export default function Page() {
                           {isRegenerating ? "…" : "Regenerate"}
                         </button>
                       )}
+                    </div>
+                    <div className="message-meta">
+                      {formatMessageTime(msg)}
+                      {msg.edited ? " • Edited" : ""}
                     </div>
                   </div>
                   {errorText ? (

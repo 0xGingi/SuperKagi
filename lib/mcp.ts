@@ -4,6 +4,10 @@ import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { env } from "./env";
 
 let mcpClientPromise: Promise<Client> | null = null;
+let cachedTools: ChatCompletionTool[] | null = null;
+let toolsFetchedAt = 0;
+let toolsPromise: Promise<ChatCompletionTool[]> | null = null;
+const TOOLS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function connectMcp(): Promise<Client> {
   const transport = new StdioClientTransport({
@@ -35,28 +39,44 @@ async function getMcpClient(): Promise<Client> {
 }
 
 export async function getMcpTools(): Promise<ChatCompletionTool[]> {
-  const client = await getMcpClient();
-  const res = await client.listTools();
-  const tools = (res as any).tools ?? [];
+  const now = Date.now();
+  if (cachedTools && now - toolsFetchedAt < TOOLS_CACHE_TTL) return cachedTools;
+  if (toolsPromise) return toolsPromise;
 
-  return tools.map((tool: any) => {
-    const schema = tool.inputSchema ||
-      tool.input_schema || { type: "object", properties: {} };
-    return {
-      type: "function" as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: {
-          type: schema.type || "object",
-          properties: schema.properties || {},
-          required: schema.required || [],
-          additionalProperties: schema.additionalProperties ?? false,
-          description: schema.description || undefined,
-        },
-      },
-    } satisfies ChatCompletionTool;
-  });
+  toolsPromise = (async () => {
+    try {
+      const client = await getMcpClient();
+      const res = await client.listTools();
+      const tools = (res as any).tools ?? [];
+
+      const mapped = tools.map((tool: any) => {
+        const schema = tool.inputSchema ||
+          tool.input_schema || { type: "object", properties: {} };
+        return {
+          type: "function" as const,
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: {
+              type: schema.type || "object",
+              properties: schema.properties || {},
+              required: schema.required || [],
+              additionalProperties: schema.additionalProperties ?? false,
+              description: schema.description || undefined,
+            },
+          },
+        } satisfies ChatCompletionTool;
+      });
+
+      cachedTools = mapped;
+      toolsFetchedAt = Date.now();
+      return mapped;
+    } finally {
+      toolsPromise = null;
+    }
+  })();
+
+  return toolsPromise;
 }
 
 export async function callMcpTool(name: string, args: Record<string, unknown>) {

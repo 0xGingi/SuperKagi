@@ -27,6 +27,7 @@ type ChatPayload = {
   apiKey?: string;
   localUrl?: string;
   systemPrompt?: string;
+  deepSearch?: boolean;
 };
 
 function normalizeContent(content: any): any {
@@ -56,6 +57,10 @@ function sanitizeMessages(
   messages: IncomingMessage[] | undefined,
   systemPrompt?: string,
 ): ChatCompletionMessageParam[] {
+  console.log("[chat] sanitizeMessages start", {
+    count: messages?.length,
+    hasSystem: !!systemPrompt,
+  });
   let sanitized = (messages || [])
     .filter((m) => !m.pending)
     .map((m) => ({
@@ -90,6 +95,13 @@ function buildClient(config: NormalizedChatConfig) {
     baseURL,
     defaultHeaders,
   });
+  console.log("[chat] buildClient", {
+    provider: config.provider,
+    model: config.model,
+    baseURL,
+    hasApiKey: !!apiKey,
+    hasHeaders: !!defaultHeaders,
+  });
   return client;
 }
 
@@ -99,19 +111,28 @@ export async function runChat(payload: ChatPayload): Promise<string> {
   const client = buildClient(resolved);
 
   let tools: ChatCompletionTool[] = [];
-  try {
-    tools = await getMcpTools();
-    console.log(
-      "[MCP] tools loaded:",
-      tools.map((t) =>
-        "function" in t
-          ? t.function.name
-          : (t as any).custom?.name || "unknown",
-      ),
-    );
-  } catch (err) {
-    console.warn("MCP tools unavailable:", (err as Error).message);
+  if (payload.deepSearch) {
+    try {
+      tools = await getMcpTools();
+      console.log(
+        "[MCP] tools loaded:",
+        tools.map((t) =>
+          "function" in t
+            ? t.function.name
+            : (t as any).custom?.name || "unknown",
+        ),
+      );
+    } catch (err) {
+      console.warn("MCP tools unavailable:", (err as Error).message);
+    }
   }
+
+  console.log("[chat] runChat start", {
+    provider: resolved.provider,
+    model: resolved.model,
+    messages: messages.length,
+    tools: tools.length,
+  });
 
   let response = await client.chat.completions.create({
     model: resolved.model,
@@ -149,6 +170,11 @@ export async function runChat(payload: ChatPayload): Promise<string> {
       }
     }
 
+    console.log("[chat] runChat post-tool call", {
+      pendingTools: choice.message.tool_calls?.length,
+      workingMessages: workingMessages.length,
+    });
+
     response = await client.chat.completions.create({
       model: resolved.model,
       messages: workingMessages,
@@ -169,19 +195,21 @@ export async function streamChat(
   const client = buildClient(resolved);
 
   let tools: ChatCompletionTool[] = [];
-  try {
-    tools = await getMcpTools();
-    console.log(
-      "[MCP] tools loaded (stream):",
-      tools.map((t) =>
-        "function" in t
-          ? t.function.name
-          : (t as any).custom?.name || "unknown",
-      ),
-    );
-  } catch (err) {
-    console.warn("MCP tools unavailable (stream):", (err as Error).message);
-    tools = [];
+  if (payload.deepSearch) {
+    try {
+      tools = await getMcpTools();
+      console.log(
+        "[MCP] tools loaded (stream):",
+        tools.map((t) =>
+          "function" in t
+            ? t.function.name
+            : (t as any).custom?.name || "unknown",
+        ),
+      );
+    } catch (err) {
+      console.warn("MCP tools unavailable (stream):", (err as Error).message);
+      tools = [];
+    }
   }
 
   const messages = baseMessages;
@@ -189,6 +217,12 @@ export async function streamChat(
   async function streamOnce() {
     const toolCalls: any[] = [];
     let finishReason: string | undefined;
+    console.log("[chat] streamOnce start", {
+      provider: resolved.provider,
+      model: resolved.model,
+      messages: messages.length,
+      tools: tools.length,
+    });
     const s = await client.chat.completions.create({
       model: resolved.model,
       messages,
@@ -224,6 +258,10 @@ export async function streamChat(
         }
       }
     }
+    console.log("[chat] streamOnce complete", {
+      finishReason,
+      toolCalls: toolCalls.length,
+    });
     return { finishReason, toolCalls };
   }
 
