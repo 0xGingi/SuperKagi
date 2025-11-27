@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - '3545:3000'
+    volumes:
+      - ./data:/app/data:z
     env_file:
       - .env
     security_opt:

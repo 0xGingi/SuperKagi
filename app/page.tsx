@@ -192,6 +192,37 @@ function messageText(content: ChatMessage["content"]): string {
   return content || "";
 }
 
+type StoredChat = {
+  id: string;
+  title?: string;
+  createdAt?: number;
+  messages: ChatMessage[];
+};
+
+function threadToStored(id: string, messages: ChatMessage[]): StoredChat {
+  return {
+    id,
+    createdAt: Number.isFinite(Number(id)) ? Number(id) : Date.now(),
+    messages: messages.map((m) => ({
+      ...m,
+      id: m.id || createMessageId(),
+      createdAt: m.createdAt || Date.now(),
+    })),
+  };
+}
+
+function chatsArrayToMap(chats: StoredChat[]): ChatMap {
+  const map: ChatMap = {};
+  chats.forEach((chat) => {
+    map[chat.id] = (chat.messages || []).map((m) => ({
+      ...m,
+      id: m.id || createMessageId(),
+      createdAt: m.createdAt || chat.createdAt || Date.now(),
+    }));
+  });
+  return map;
+}
+
 function resolveProvider(value?: string): Provider {
   if (value === "openrouter" || value === "nanogpt") return value;
   return "local";
@@ -289,6 +320,7 @@ export default function Page() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [messageSearch, setMessageSearch] = useState("");
+  const [persistLoaded, setPersistLoaded] = useState(false);
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -315,6 +347,50 @@ export default function Page() {
 
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    (async () => {
+      try {
+        const cfgRes = await fetch("/api/persistence/config", {
+          cache: "no-store",
+        });
+        if (cfgRes.ok) {
+          const data = await cfgRes.json();
+          if (data?.config) {
+            setConfig((prev) =>
+              mergeEnvDefaults(
+                prev,
+                { ...prev, ...(data.config as Partial<UiConfig>) },
+                serverDefaults,
+              ),
+            );
+          }
+        }
+      } catch {}
+
+      try {
+        const chatRes = await fetch("/api/persistence/chats", {
+          cache: "no-store",
+        });
+        if (chatRes.ok) {
+          const data = await chatRes.json();
+          if (Array.isArray(data?.chats)) {
+            const mapped = chatsArrayToMap(data.chats);
+            if (Object.keys(mapped).length) {
+              setChats((prev) => ({ ...mapped, ...prev }));
+              const firstId =
+                localStorage.getItem("currentChatId") ||
+                Object.keys(mapped)[0] ||
+                "";
+              if (firstId) setCurrentChatId(firstId);
+            }
+          }
+        }
+      } catch {}
+      setPersistLoaded(true);
+    })();
+  }, [hydrated, serverDefaults]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -372,11 +448,39 @@ export default function Page() {
       localStorage.setItem("config", JSON.stringify(config));
     } catch {}
   }, [config]);
+
+  useEffect(() => {
+    if (!hydrated || !persistLoaded) return;
+    const timer = setTimeout(() => {
+      fetch("/api/persistence/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config }),
+      }).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [config, hydrated, persistLoaded]);
+
   useEffect(() => {
     try {
       localStorage.setItem("chats", JSON.stringify(chats));
     } catch {}
   }, [chats]);
+
+  useEffect(() => {
+    if (!hydrated || !persistLoaded) return;
+    const thread = chats[currentChatId] || [];
+    if (!thread.length) return;
+    const payload = threadToStored(currentChatId, thread);
+    const timer = setTimeout(() => {
+      fetch("/api/persistence/chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [chats, currentChatId, hydrated, persistLoaded]);
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => e.preventDefault();
@@ -708,6 +812,7 @@ export default function Page() {
       let buffer = "";
       let assembled = "";
       let finished = false;
+      let hasContent = false;
 
       const update = (finalize = false, errorText?: string) => {
         setChats((prev) => {
@@ -754,11 +859,16 @@ export default function Page() {
             }
             if (typeof data.content === "string") {
               assembled += data.content;
+              hasContent = hasContent || !!data.content.length;
               update(false);
             }
           } catch {}
         }
         if (finished) break;
+      }
+      if (!hasContent) {
+        await fallbackToSingle(chatId, payload, targetAssistantId);
+        return;
       }
       update(true);
     } catch (_err) {
@@ -1062,6 +1172,9 @@ export default function Page() {
     const next = { ...chats } as ChatMap;
     delete next[id];
     setChats(next);
+    fetch(`/api/persistence/chats/${id}`, { method: "DELETE" }).catch(
+      () => undefined,
+    );
     if (currentChatId === id) {
       const ids = Object.keys(next).sort().reverse();
       const nextId = ids[0] || Date.now().toString();
