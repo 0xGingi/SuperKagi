@@ -9,8 +9,9 @@ export async function GET() {
     const data = backupAll();
     return NextResponse.json(data);
   } catch (error) {
+    console.error("[persistence/backup] GET error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }
@@ -22,8 +23,9 @@ export async function POST(request: Request) {
     restoreAll(body || {});
     return NextResponse.json({ ok: true });
   } catch (error) {
+    console.error("[persistence/backup] POST error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }

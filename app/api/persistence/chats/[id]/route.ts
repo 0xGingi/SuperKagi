@@ -15,8 +15,9 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(chat);
   } catch (error) {
+    console.error("[persistence/chat/:id] GET error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }
@@ -31,8 +32,9 @@ export async function DELETE(
     deleteChat(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    console.error("[persistence/chat/:id] DELETE error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }

@@ -1,9 +1,9 @@
 "use client";
 
 import clsx from "clsx";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MarkdownRenderer } from "@/components/markdown-renderer";
 
 import { exportChat } from "@/lib/export";
 import {
@@ -17,6 +17,17 @@ import {
   useKeyboardShortcuts,
 } from "@/lib/keyboard-shortcuts";
 import { useTheme } from "@/lib/theme";
+
+const MarkdownRenderer = dynamic(
+  () =>
+    import("@/components/markdown-renderer").then(
+      (mod) => mod.MarkdownRenderer,
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="markdown-loading">Rendering…</div>,
+  },
+);
 
 export type Provider = "local" | "openrouter" | "nanogpt";
 
@@ -321,6 +332,8 @@ export default function Page() {
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [messageSearch, setMessageSearch] = useState("");
   const [persistLoaded, setPersistLoaded] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const swRegisteredRef = useRef(false);
 
   const heroInputRef = useRef<HTMLInputElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -346,6 +359,18 @@ export default function Page() {
       .catch(() => undefined);
 
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (swRegisteredRef.current) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator))
+      return;
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(() => {
+        swRegisteredRef.current = true;
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -606,6 +631,12 @@ export default function Page() {
         ) as HTMLInputElement;
         searchInput?.focus();
       },
+      FOCUS_THREAD_SEARCH: () => {
+        const searchInput = document.getElementById(
+          "thread-search-input",
+        ) as HTMLInputElement;
+        searchInput?.focus();
+      },
       TOGGLE_THEME: () => {
         setTheme(
           theme === "dark" ? "light" : theme === "light" ? "dark" : "system",
@@ -746,6 +777,7 @@ export default function Page() {
     }
     if (!message && attachments.length === 0) return;
 
+    setProviderError(null);
     setHeroValue("");
     setComposerValue("");
 
@@ -803,6 +835,9 @@ export default function Page() {
       });
 
       if (!res.ok || !res.body) {
+        setProviderError(
+          `Streaming failed (${res.status || "network error"}) — retrying fallback.`,
+        );
         await fallbackToSingle(chatId, payload, targetAssistantId);
         return;
       }
@@ -872,6 +907,7 @@ export default function Page() {
       }
       update(true);
     } catch (_err) {
+      setProviderError("Streaming error — retrying fallback.");
       await fallbackToSingle(chatId, payload, targetAssistantId);
     } finally {
       clearTimeout(timeoutId);
@@ -925,6 +961,7 @@ export default function Page() {
         }
         return { ...prev, [chatId]: thread };
       });
+      setProviderError((e as Error).message || "Request failed.");
     }
   }
 
@@ -1043,6 +1080,7 @@ export default function Page() {
     setHeroValue("");
     setComposerValue("");
     setIsGeneratingImage(true);
+    setProviderError(null);
 
     const chatId = currentChatId || Date.now().toString();
     const userMsg: ChatMessage = {
@@ -1102,6 +1140,7 @@ export default function Page() {
           }
           return { ...prev, [chatId]: thread };
         });
+        setProviderError(errorMsg);
         return;
       }
 
@@ -1145,6 +1184,7 @@ export default function Page() {
         }
         return { ...prev, [chatId]: thread };
       });
+      setProviderError((e as Error).message || "Image request failed.");
     } finally {
       setIsGeneratingImage(false);
     }
@@ -1409,6 +1449,16 @@ export default function Page() {
           .slice()
           .reverse()
           .find((m) => m.role === "user");
+        const lastTime =
+          last?.createdAt ||
+          (chats[id] || []).find((m) => m.createdAt)?.createdAt ||
+          parseInt(id, 10) ||
+          Date.now();
+        const dateText = new Date(lastTime).toLocaleDateString();
+        const timeText = new Date(lastTime).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
         let labelText = "";
         if (Array.isArray(last?.content)) {
           labelText = last.content
@@ -1422,9 +1472,18 @@ export default function Page() {
         }
         const label = (labelText || `Chat ${id.slice(-4)}`).slice(0, 40);
         if (q && !label.toLowerCase().includes(q)) return null;
-        return { id, label };
+        return { id, label, dateText, timeText };
       })
-      .filter(Boolean) as { id: string; label: string }[];
+      .filter(
+        (
+          item,
+        ): item is {
+          id: string;
+          label: string;
+          dateText: string;
+          timeText: string;
+        } => !!item,
+      );
   }
 
   function openFilePicker() {
@@ -1599,7 +1658,7 @@ export default function Page() {
                 <div>
                   <span className="chat-title">{item.label}</span>
                   <span className="chat-meta">
-                    {new Date(parseInt(item.id, 10)).toLocaleDateString()}
+                    {item.dateText} • {item.timeText}
                   </span>
                 </div>
                 <button
@@ -1735,6 +1794,19 @@ export default function Page() {
             aria-relevant="additions"
             style={{ display: isEmpty ? "none" : undefined }}
           >
+            {providerError ? (
+              <div className="provider-error" role="alert">
+                <span>{providerError}</span>
+                <button
+                  type="button"
+                  className="mini-btn ghost"
+                  onClick={() => setProviderError(null)}
+                  title="Dismiss"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
             {!isEmpty ? (
               <div className="thread-toolbar">
                 <div className="thread-search">

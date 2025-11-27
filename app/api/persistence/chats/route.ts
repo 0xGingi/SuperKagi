@@ -17,8 +17,9 @@ export async function GET() {
       .filter(Boolean) as StoredChat[];
     return NextResponse.json({ chats });
   } catch (error) {
+    console.error("[persistence/chats] GET error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }
@@ -36,8 +37,9 @@ export async function POST(request: Request) {
     saveChat(body);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    console.error("[persistence/chats] POST error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }

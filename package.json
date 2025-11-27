@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.23.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.4.6",
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
     "next": "16.0.5",

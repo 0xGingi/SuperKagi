@@ -4,7 +4,7 @@ services:
     ports:
       - '3545:3000'
     volumes:
-      - ./data:/app/data:z
+      - ./data:/app/data:rw,z
     env_file:
       - .env
     security_opt:

@@ -9,8 +9,9 @@ export async function GET() {
     const config = loadConfig();
     return NextResponse.json({ config });
   } catch (error) {
+    console.error("[persistence/config] GET error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }
@@ -25,8 +26,9 @@ export async function POST(request: Request) {
     saveConfig(body.config);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    console.error("[persistence/config] POST error", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Persistence error", details: (error as Error).message },
       { status: 500 },
     );
   }

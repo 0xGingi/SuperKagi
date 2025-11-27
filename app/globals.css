@@ -449,6 +449,32 @@ a {
   background: var(--bg-card);
 }
 
+.provider-error {
+  width: min(900px, 86%);
+  margin: 10px auto;
+  padding: 12px 14px;
+  border: 1px solid #8c1c1c;
+  border-radius: 12px;
+  color: #ffdede;
+  background: #2b0f0f;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+:root.light .provider-error {
+  background: #fff5f5;
+  border-color: #f3c2c2;
+  color: #7a1b1b;
+}
+
+.markdown-loading {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 6px 0;
+}
+
 .message {
   display: flex;
   margin: 8px 0;

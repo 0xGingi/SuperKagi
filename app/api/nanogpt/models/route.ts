@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 
+type CacheKey = string;
+type CacheEntry = { data: any; fetchedAt: number };
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const nanoModelCache = new Map<CacheKey, CacheEntry>();
+
+function cacheKey(apiKey: string, detailed: boolean) {
+  return `${apiKey || "none"}::${detailed ? "detailed" : "basic"}`;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -32,6 +41,12 @@ export async function POST(request: Request) {
   }
 
   const url = buildModelsUrl() + (detailed ? "?detailed=true" : "");
+  const key = cacheKey(apiKey, detailed);
+
+  const cached = nanoModelCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data);
+  }
 
   try {
     const resp = await fetch(url, {
@@ -65,7 +80,9 @@ export async function POST(request: Request) {
           ? (data as any).models
           : [];
 
-    return NextResponse.json({ models, raw: data });
+    const payload = { models, raw: data };
+    nanoModelCache.set(key, { data: payload, fetchedAt: Date.now() });
+    return NextResponse.json(payload);
   } catch (error) {
     return NextResponse.json(
       { error: "Request to NanoGPT failed", details: (error as Error).message },

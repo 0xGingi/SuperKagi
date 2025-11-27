@@ -21,49 +21,80 @@ export type StoredChat = {
 
 export type StoredConfig = Record<string, unknown>;
 
-let db: any | null = null;
+type SqliteInstance = {
+  pragma?: (sql: string) => unknown;
+  exec: (sql: string) => unknown;
+  prepare: (sql: string) => any;
+  transaction?: (fn: () => void) => () => void;
+};
+
+let db: SqliteInstance | null = null;
 const require = createRequire(import.meta.url);
 
-function getDatabaseCtor(): any {
-  if ((globalThis as any).Bun) {
+function createDatabase(dbPath: string): SqliteInstance {
+  try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require("bun:sqlite");
-    return mod.Database;
+    const Better = require("better-sqlite3");
+    return new Better(dbPath);
+  } catch (err) {
+    if (typeof (globalThis as any).Bun !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const BunSqlite = require("bun:sqlite");
+      return new BunSqlite.Database(dbPath, { create: true, strict: true });
+    }
+    throw err;
   }
-  throw new Error("bun:sqlite is only available when running under Bun.");
 }
 
 function getDb() {
   if (db) return db;
-  const dataDir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  const dbPath = path.join(dataDir, "app.db");
-  const DatabaseCtor = getDatabaseCtor();
-  db = new DatabaseCtor(dbPath, { create: true, strict: true });
-  db.exec("PRAGMA journal_mode = WAL;");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS chats (
-      id TEXT PRIMARY KEY,
-      title TEXT,
-      created_at INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      chat_id TEXT,
-      role TEXT,
-      content TEXT,
-      pending INTEGER,
-      error TEXT,
-      created_at INTEGER,
-      edited INTEGER,
-      FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-    );
-    CREATE TABLE IF NOT EXISTS config (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
-  `);
-  return db;
+  try {
+    const dataDir = path.join(process.cwd(), "data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    const dbPath = path.join(dataDir, "app.db");
+    db = createDatabase(dbPath);
+    if (db.pragma) {
+      try {
+        db.pragma("journal_mode = WAL");
+      } catch {}
+    } else {
+      db.exec("PRAGMA journal_mode = WAL;");
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chats (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        created_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        chat_id TEXT,
+        role TEXT,
+        content TEXT,
+        pending INTEGER,
+        error TEXT,
+        created_at INTEGER,
+        edited INTEGER,
+        FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS config (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `);
+    return db;
+  } catch (error) {
+    console.error("[persistence] failed to init db:", error);
+    throw error;
+  }
+}
+
+function runTransaction(database: SqliteInstance, fn: () => void) {
+  if (typeof database.transaction === "function") {
+    return database.transaction(fn)();
+  }
+  // Fallback: just execute (no transactional guarantees)
+  return fn();
 }
 
 export function listChats(): Array<{
@@ -88,16 +119,16 @@ export function getChat(id: string): StoredChat | null {
   const database = getDb();
   const chatRow = database
     .prepare(
-      "SELECT id, title, created_at as createdAt FROM chats WHERE id = $id LIMIT 1",
+      "SELECT id, title, created_at as createdAt FROM chats WHERE id = :id LIMIT 1",
     )
-    .get({ $id: id }) as any;
+    .get({ id }) as any;
   if (!chatRow) return null;
   const messages = database
     .prepare(
       `SELECT id, role, content, pending, error, created_at as createdAt, edited
-       FROM messages WHERE chat_id = $id ORDER BY created_at ASC`,
+       FROM messages WHERE chat_id = :id ORDER BY created_at ASC`,
     )
-    .all({ $id: id })
+    .all({ id })
     .map((row: any) => ({
       id: row.id,
       role: row.role,
@@ -128,52 +159,52 @@ export function saveChat(chat: StoredChat) {
     `Chat ${chat.id.slice(-4)}`;
 
   const insertChat = database.prepare(
-    "INSERT INTO chats (id, title, created_at) VALUES ($id, $title, $createdAt) ON CONFLICT(id) DO UPDATE SET title=excluded.title, created_at=excluded.created_at",
+    "INSERT INTO chats (id, title, created_at) VALUES (:id, :title, :createdAt) ON CONFLICT(id) DO UPDATE SET title=excluded.title, created_at=excluded.created_at",
   );
   const deleteMessages = database.prepare(
-    "DELETE FROM messages WHERE chat_id = $id",
+    "DELETE FROM messages WHERE chat_id = :id",
   );
   const insertMessage = database.prepare(
     `INSERT INTO messages
       (id, chat_id, role, content, pending, error, created_at, edited)
-     VALUES ($id, $chat_id, $role, $content, $pending, $error, $created_at, $edited)`,
+     VALUES (:id, :chat_id, :role, :content, :pending, :error, :created_at, :edited)`,
   );
 
-  const tx = database.transaction(() => {
-    insertChat.run({ $id: chat.id, $title: title, $createdAt: createdAt });
-    deleteMessages.run({ $id: chat.id });
+  const tx = () => {
+    insertChat.run({ id: chat.id, title, createdAt });
+    deleteMessages.run({ id: chat.id });
     for (const msg of chat.messages || []) {
       insertMessage.run({
-        $id: msg.id,
-        $chat_id: chat.id,
-        $role: msg.role,
-        $content: JSON.stringify(msg.content ?? ""),
-        $pending: msg.pending ? 1 : 0,
-        $error: msg.error || null,
-        $created_at: msg.createdAt ?? Date.now(),
-        $edited: msg.edited ? 1 : 0,
+        id: msg.id,
+        chat_id: chat.id,
+        role: msg.role,
+        content: JSON.stringify(msg.content ?? ""),
+        pending: msg.pending ? 1 : 0,
+        error: msg.error || null,
+        created_at: msg.createdAt ?? Date.now(),
+        edited: msg.edited ? 1 : 0,
       });
     }
-  });
-  tx();
+  };
+  runTransaction(database, tx);
 }
 
 export function deleteChat(id: string) {
   const database = getDb();
-  database.prepare("DELETE FROM chats WHERE id = $id").run({ $id: id });
+  database.prepare("DELETE FROM chats WHERE id = :id").run({ id });
 }
 
 export function saveConfig(config: StoredConfig) {
   const database = getDb();
   const insert = database.prepare(
-    "INSERT INTO config (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    "INSERT INTO config (key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
   );
-  const tx = database.transaction(() => {
+  const tx = () => {
     Object.entries(config || {}).forEach(([key, value]) => {
-      insert.run({ $key: key, $value: JSON.stringify(value) });
+      insert.run({ key, value: JSON.stringify(value) });
     });
-  });
-  tx();
+  };
+  runTransaction(database, tx);
 }
 
 export function loadConfig(): StoredConfig {
@@ -202,7 +233,7 @@ export function restoreAll(data: {
   config?: StoredConfig;
 }) {
   const database = getDb();
-  const clearAll = database.transaction(() => {
+  const clearAll = () => {
     database.exec(
       "DELETE FROM messages; DELETE FROM chats; DELETE FROM config;",
     );
@@ -210,8 +241,8 @@ export function restoreAll(data: {
     for (const c of data.chats || []) {
       saveChat(c);
     }
-  });
-  clearAll();
+  };
+  runTransaction(database, clearAll);
 }
 
 function deriveTitleFromMessages(messages: StoredMessage[]): string | null {

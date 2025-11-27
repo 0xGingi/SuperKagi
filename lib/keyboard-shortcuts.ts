@@ -24,6 +24,7 @@ export const DEFAULT_SHORTCUTS = {
   TOGGLE_CONFIG: "ctrl+,",
   TOGGLE_DEEP_SEARCH: "ctrl+d",
   FOCUS_SEARCH: "ctrl+k",
+  FOCUS_THREAD_SEARCH: "ctrl+shift+f",
   EXPORT_CHAT: "ctrl+e",
   TOGGLE_THEME: "ctrl+t",
 } as const;
@@ -55,6 +56,11 @@ export const SHORTCUT_CONFIGS: ShortcutConfig[] = [
     action: "FOCUS_SEARCH",
     label: "Focus Search",
     defaultKey: DEFAULT_SHORTCUTS.FOCUS_SEARCH,
+  },
+  {
+    action: "FOCUS_THREAD_SEARCH",
+    label: "Focus Message Search",
+    defaultKey: DEFAULT_SHORTCUTS.FOCUS_THREAD_SEARCH,
   },
   {
     action: "EXPORT_CHAT",
