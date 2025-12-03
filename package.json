@@ -12,12 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.23.0",
+    "@modelcontextprotocol/sdk": "^1.24.2",
     "@types/better-sqlite3": "^7.6.13",
-    "better-sqlite3": "^12.4.6",
+    "better-sqlite3": "^12.5.0",
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
-    "next": "16.0.5",
+    "next": "16.0.6",
     "openai": "^6.9.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

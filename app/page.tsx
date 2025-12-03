@@ -317,6 +317,12 @@ export default function Page() {
   const [nanoModelQuery, setNanoModelQuery] = useState("");
   const [nanoModelsStatus, setNanoModelsStatus] = useState("");
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
+  const [openrouterModels, setOpenrouterModels] = useState<
+    { id: string; label: string; pricing?: string }[]
+  >([]);
+  const [openrouterModelQuery, setOpenrouterModelQuery] = useState("");
+  const [openrouterModelsStatus, setOpenrouterModelsStatus] = useState("");
+  const [openrouterModelsLoading, setOpenrouterModelsLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [imageSettingsExpanded, setImageSettingsExpanded] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"settings" | "shortcuts">(
@@ -585,13 +591,17 @@ export default function Page() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    if (config.provider !== "nanogpt") return;
-    if (!nanoModelsStatus) {
+    if (config.provider === "nanogpt" && !nanoModelsStatus) {
       setNanoModelsStatus(
         "Load subscription-only models using your NanoGPT API key.",
       );
     }
-  }, [config.provider, nanoModelsStatus]);
+    if (config.provider === "openrouter" && !openrouterModelsStatus) {
+      setOpenrouterModelsStatus(
+        "Load available models using your OpenRouter API key.",
+      );
+    }
+  }, [config.provider, nanoModelsStatus, openrouterModelsStatus]);
 
   // Load custom shortcuts
   useEffect(() => {
@@ -1297,6 +1307,18 @@ export default function Page() {
     return "";
   }
 
+  function formatOpenrouterPricing(model: any) {
+    const pricing = model?.pricing || null;
+    if (!pricing) return "";
+    if (typeof pricing === "string") return pricing;
+    const prompt = pricing.prompt || pricing.input || pricing["1k_input"];
+    const completion = pricing.completion || pricing.output || pricing["1k_output"];
+    if (prompt && completion) return `${prompt}/${completion}`;
+    if (prompt) return `in ${prompt}`;
+    if (completion) return `out ${completion}`;
+    return "";
+  }
+
   function normalizeNanoModels(
     list: any[],
   ): { id: string; label: string; pricing?: string }[] {
@@ -1316,6 +1338,22 @@ export default function Page() {
       .filter(Boolean) as { id: string; label: string; pricing?: string }[];
   }
 
+  function normalizeOpenrouterModels(
+    list: any[],
+  ): { id: string; label: string; pricing?: string }[] {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const id = item.id || item.model || item.name;
+        if (!id) return null;
+        const pricing = formatOpenrouterPricing(item);
+        const label = pricing ? `${id} · ${pricing}` : String(id);
+        return { id: String(id), label, pricing };
+      })
+      .filter(Boolean) as { id: string; label: string; pricing?: string }[];
+  }
+
   function applyNanoModel(id: string) {
     setConfig((prev) => ({
       ...prev,
@@ -1324,6 +1362,18 @@ export default function Page() {
       userSet: {
         ...(prev.userSet || { models: {} }),
         models: { ...(prev.userSet?.models || {}), nanogpt: true },
+      },
+    }));
+  }
+
+  function applyOpenrouterModel(id: string) {
+    setConfig((prev) => ({
+      ...prev,
+      model: id,
+      models: { ...prev.models, openrouter: id },
+      userSet: {
+        ...(prev.userSet || { models: {} }),
+        models: { ...(prev.userSet?.models || {}), openrouter: true },
       },
     }));
   }
@@ -1359,6 +1409,40 @@ export default function Page() {
       setNanoModelsStatus(`Failed: ${(error as Error).message}`);
     } finally {
       setNanoModelsLoading(false);
+    }
+  }
+
+  async function fetchOpenrouterModels() {
+    setOpenrouterModelsLoading(true);
+    setOpenrouterModelsStatus("Fetching OpenRouter models…");
+    try {
+      const res = await fetch("/api/openrouter/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: config.apiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOpenrouterModels([]);
+        setOpenrouterModelsStatus(
+          data?.error ? String(data.error) : `Request failed (${res.status})`,
+        );
+        return;
+      }
+      const normalized = normalizeOpenrouterModels(
+        data?.models || data?.raw?.data || data?.raw || [],
+      );
+      setOpenrouterModels(normalized);
+      setOpenrouterModelsStatus(
+        normalized.length
+          ? `Loaded ${normalized.length} models.`
+          : "No models returned. Check API key.",
+      );
+    } catch (error) {
+      setOpenrouterModels([]);
+      setOpenrouterModelsStatus(`Failed: ${(error as Error).message}`);
+    } finally {
+      setOpenrouterModelsLoading(false);
     }
   }
 
@@ -1510,6 +1594,15 @@ export default function Page() {
         m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q),
     );
   }, [nanoModels, nanoModelQuery]);
+
+  const filteredOpenrouterModels = useMemo(() => {
+    const q = openrouterModelQuery.toLowerCase();
+    if (!q) return openrouterModels;
+    return openrouterModels.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q),
+    );
+  }, [openrouterModels, openrouterModelQuery]);
 
   return (
     <>
@@ -2217,6 +2310,16 @@ export default function Page() {
                               {nanoModelsLoading ? "Fetching…" : "Load models"}
                             </button>
                           )}
+                          {config.provider === "openrouter" && (
+                            <button
+                              type="button"
+                              className="mini-btn"
+                              onClick={fetchOpenrouterModels}
+                              disabled={openrouterModelsLoading}
+                            >
+                              {openrouterModelsLoading ? "Fetching…" : "Load models"}
+                            </button>
+                          )}
                         </div>
 
                         {config.provider === "nanogpt" && (
@@ -2257,6 +2360,60 @@ export default function Page() {
                                           config.model) === m.id,
                                     })}
                                     onClick={() => applyNanoModel(m.id)}
+                                    title={m.label}
+                                  >
+                                    <span className="label">{m.id}</span>
+                                    {m.pricing ? (
+                                      <span className="meta">{m.pricing}</span>
+                                    ) : null}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="nano-status">
+                                  No models loaded yet.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {config.provider === "openrouter" && (
+                          <div className="nano-models">
+                            <div className="nano-status">
+                              {openrouterModelsStatus ||
+                                "Uses your OpenRouter API key to load available models."}
+                            </div>
+                            <div className="nano-model-actions">
+                              <input
+                                className="field"
+                                id="openrouter-model-search"
+                                placeholder="Filter OpenRouter models"
+                                value={openrouterModelQuery}
+                                onChange={(e) =>
+                                  setOpenrouterModelQuery(e.target.value)
+                                }
+                                autoComplete="off"
+                              />
+                              <button
+                                type="button"
+                                className="mini-btn"
+                                onClick={() => setOpenrouterModelQuery("")}
+                                disabled={!openrouterModelQuery}
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            <div className="nano-model-list">
+                              {filteredOpenrouterModels.length ? (
+                                filteredOpenrouterModels.map((m) => (
+                                  <button
+                                    type="button"
+                                    key={m.id}
+                                    className={clsx("model-pill", {
+                                      active:
+                                        (config.models?.openrouter ||
+                                          config.model) === m.id,
+                                    })}
+                                    onClick={() => applyOpenrouterModel(m.id)}
                                     title={m.label}
                                   >
                                     <span className="label">{m.id}</span>
