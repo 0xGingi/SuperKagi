@@ -44,6 +44,7 @@ export type ChatMessage = {
   createdAt?: number;
   edited?: boolean;
   tool_call_id?: string;
+  cost?: number;
 };
 
 export type ChatMap = Record<string, ChatMessage[]>;
@@ -57,6 +58,8 @@ export type UiConfig = {
   imageSteps: number;
   imageGuidanceScale: number;
   imageSeed?: number;
+  apiKeyOpenrouter?: string;
+  apiKeyNanogpt?: string;
   apiKey?: string;
   localUrl: string;
   systemPrompt: string;
@@ -173,6 +176,8 @@ const initialConfig: UiConfig = {
   imageSize: "1024x1024",
   imageSteps: 30,
   imageGuidanceScale: 7.5,
+  apiKeyOpenrouter: "",
+  apiKeyNanogpt: "",
   apiKey: "",
   localUrl: fallbackDefaults.localUrl,
   systemPrompt: fallbackDefaults.systemPrompt,
@@ -245,6 +250,12 @@ function mergeEnvDefaults(
   env: typeof fallbackDefaults,
 ): UiConfig {
   const base = { ...initialConfig, ...existing } as UiConfig;
+  if (!base.apiKeyOpenrouter && (existing as any).apiKey) {
+    base.apiKeyOpenrouter = (existing as any).apiKey;
+  }
+  if (!base.apiKeyNanogpt && (existing as any).apiKey) {
+    base.apiKeyNanogpt = (existing as any).apiKey;
+  }
   const envModels = {
     local: env.modelLocal || fallbackDefaults.modelLocal,
     openrouter: env.modelOpenrouter || fallbackDefaults.modelOpenrouter,
@@ -719,6 +730,13 @@ export default function Page() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  function formatCost(cost?: number | null) {
+    if (cost == null || Number.isNaN(cost)) return "";
+    if (cost >= 0.01) return `$${cost.toFixed(2)}`;
+    if (cost >= 0.001) return `$${cost.toFixed(3)}`;
+    return `$${cost.toFixed(4)}`;
+  }
+
   const totalCount = thread.length;
   const visibleCount = visibleThread.length;
 
@@ -740,12 +758,25 @@ export default function Page() {
     );
   }
 
+  function getProviderApiKey(provider: Provider, cfg: UiConfig = config) {
+    const providerKey =
+      provider === "openrouter"
+        ? cfg.apiKeyOpenrouter
+        : provider === "nanogpt"
+          ? cfg.apiKeyNanogpt
+          : "";
+    return providerKey || cfg.apiKey || "";
+  }
+
   function buildPayload(messages: ChatMessage[]) {
+    const apiKey = getProviderApiKey(config.provider);
     return {
       messages,
       provider: config.provider,
       model: getActiveModel(),
-      apiKey: config.apiKey,
+      apiKey,
+      apiKeyOpenrouter: config.apiKeyOpenrouter,
+      apiKeyNanogpt: config.apiKeyNanogpt,
       localUrl: config.localUrl,
       systemPrompt:
         (config.systemPrompt || "") +
@@ -858,6 +889,7 @@ export default function Page() {
       let assembled = "";
       let finished = false;
       let hasContent = false;
+      let latestCost: number | undefined;
 
       const update = (finalize = false, errorText?: string) => {
         setChats((prev) => {
@@ -873,6 +905,7 @@ export default function Page() {
               content: assembled,
               pending: !finalize,
               error: errorText,
+              cost: latestCost ?? thread[idx].cost,
             };
           }
           return { ...prev, [chatId]: thread };
@@ -901,6 +934,12 @@ export default function Page() {
               update(true, data.error);
               await fallbackToSingle(chatId, payload, targetAssistantId);
               return;
+            }
+            if (data?.meta) {
+              if (typeof data.meta.cost === "number") {
+                latestCost = data.meta.cost;
+              }
+              continue;
             }
             if (typeof data.content === "string") {
               assembled += data.content;
@@ -935,7 +974,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const { content } = await r.json();
+      const { content, cost } = await r.json();
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
         const idx =
@@ -949,6 +988,7 @@ export default function Page() {
             content,
             pending: false,
             error: undefined,
+            cost: typeof cost === "number" ? cost : thread[idx].cost,
           };
         }
         return { ...prev, [chatId]: thread };
@@ -1127,7 +1167,7 @@ export default function Page() {
           num_inference_steps: config.imageSteps,
           guidance_scale: config.imageGuidanceScale,
           seed: config.imageSeed,
-          apiKey: config.apiKey,
+          apiKey: getProviderApiKey("nanogpt"),
         }),
       });
 
@@ -1312,7 +1352,8 @@ export default function Page() {
     if (!pricing) return "";
     if (typeof pricing === "string") return pricing;
     const prompt = pricing.prompt || pricing.input || pricing["1k_input"];
-    const completion = pricing.completion || pricing.output || pricing["1k_output"];
+    const completion =
+      pricing.completion || pricing.output || pricing["1k_output"];
     if (prompt && completion) return `${prompt}/${completion}`;
     if (prompt) return `in ${prompt}`;
     if (completion) return `out ${completion}`;
@@ -1385,7 +1426,10 @@ export default function Page() {
       const res = await fetch("/api/nanogpt/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: config.apiKey, detailed: true }),
+        body: JSON.stringify({
+          apiKey: getProviderApiKey("nanogpt"),
+          detailed: true,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1419,7 +1463,7 @@ export default function Page() {
       const res = await fetch("/api/openrouter/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: config.apiKey }),
+        body: JSON.stringify({ apiKey: getProviderApiKey("openrouter") }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1485,7 +1529,8 @@ export default function Page() {
           localUrl: prev.localUrl !== serverDefaults.localUrl,
           systemPrompt: prev.systemPrompt !== serverDefaults.systemPrompt,
           deepSearch: prev.deepSearch !== serverDefaults.deepSearch,
-          apiKey: !!prev.apiKey,
+          apiKey:
+            !!prev.apiKeyOpenrouter || !!prev.apiKeyNanogpt || !!prev.apiKey,
         },
       };
       return next;
@@ -1499,7 +1544,9 @@ export default function Page() {
     try {
       const payload = {
         provider: config.provider,
-        apiKey: config.apiKey,
+        apiKey: getProviderApiKey(config.provider),
+        apiKeyOpenrouter: config.apiKeyOpenrouter,
+        apiKeyNanogpt: config.apiKeyNanogpt,
         localUrl: config.localUrl,
       };
       const res = await fetch("/api/test", {
@@ -1556,7 +1603,12 @@ export default function Page() {
         }
         const label = (labelText || `Chat ${id.slice(-4)}`).slice(0, 40);
         if (q && !label.toLowerCase().includes(q)) return null;
-        return { id, label, dateText, timeText };
+        const totalCost = (chats[id] || []).reduce(
+          (sum, msg) => sum + (msg.cost || 0),
+          0,
+        );
+        const costText = totalCost > 0 ? formatCost(totalCost) : "";
+        return { id, label, dateText, timeText, costText, totalCost };
       })
       .filter(
         (
@@ -1566,6 +1618,8 @@ export default function Page() {
           label: string;
           dateText: string;
           timeText: string;
+          costText: string;
+          totalCost: number;
         } => !!item,
       );
   }
@@ -1586,6 +1640,7 @@ export default function Page() {
   }
 
   const deepOn = !!config.deepSearch;
+  const providerApiKey = getProviderApiKey(config.provider);
   const filteredNanoModels = useMemo(() => {
     const q = nanoModelQuery.toLowerCase();
     if (!q) return nanoModels;
@@ -1752,6 +1807,7 @@ export default function Page() {
                   <span className="chat-title">{item.label}</span>
                   <span className="chat-meta">
                     {item.dateText} • {item.timeText}
+                    {item.costText ? ` • ${item.costText}` : ""}
                   </span>
                 </div>
                 <button
@@ -2035,6 +2091,9 @@ export default function Page() {
                     </div>
                     <div className="message-meta">
                       {formatMessageTime(msg)}
+                      {msg.cost != null && !Number.isNaN(msg.cost)
+                        ? ` • ${formatCost(msg.cost)}`
+                        : ""}
                       {msg.edited ? " • Edited" : ""}
                     </div>
                   </div>
@@ -2317,7 +2376,9 @@ export default function Page() {
                               onClick={fetchOpenrouterModels}
                               disabled={openrouterModelsLoading}
                             >
-                              {openrouterModelsLoading ? "Fetching…" : "Load models"}
+                              {openrouterModelsLoading
+                                ? "Fetching…"
+                                : "Load models"}
                             </button>
                           )}
                         </div>
@@ -2449,23 +2510,34 @@ export default function Page() {
                           className="field"
                           id="api-key"
                           type="password"
-                          value={config.apiKey || ""}
+                          value={providerApiKey || ""}
                           placeholder={
                             config.provider === "openrouter"
-                              ? serverDefaults.hasApiKey && !config.apiKey
+                              ? serverDefaults.hasApiKey && !providerApiKey
                                 ? "Using server default"
                                 : ""
                               : config.provider === "nanogpt" &&
                                   serverDefaults.hasNanoApiKey &&
-                                  !config.apiKey
+                                  !providerApiKey
                                 ? "Using server default"
                                 : ""
                           }
                           onChange={(e) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              apiKey: e.target.value,
-                            }))
+                            setConfig((prev) => {
+                              if (prev.provider === "openrouter") {
+                                return {
+                                  ...prev,
+                                  apiKeyOpenrouter: e.target.value,
+                                };
+                              }
+                              if (prev.provider === "nanogpt") {
+                                return {
+                                  ...prev,
+                                  apiKeyNanogpt: e.target.value,
+                                };
+                              }
+                              return prev;
+                            })
                           }
                           autoComplete="off"
                         />
@@ -2489,7 +2561,7 @@ export default function Page() {
                             className="mini-btn"
                             onClick={() =>
                               navigator.clipboard
-                                .writeText(config.apiKey || "")
+                                .writeText(providerApiKey || "")
                                 .catch(() => undefined)
                             }
                           >

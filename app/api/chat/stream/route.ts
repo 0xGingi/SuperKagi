@@ -13,7 +13,13 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
       streamChat(body, (text) => send({ content: text }))
-        .then(() => {
+        .then((meta) => {
+          if (
+            meta &&
+            (meta.cost != null || meta.model || meta.usage !== undefined)
+          ) {
+            send({ meta });
+          }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         })

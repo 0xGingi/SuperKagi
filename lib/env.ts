@@ -76,6 +76,8 @@ export type NormalizedChatConfig = {
   provider: Provider;
   model: string;
   apiKey?: string;
+  apiKeyOpenrouter?: string;
+  apiKeyNanogpt?: string;
   localUrl: string;
   systemPrompt: string;
   nanoBaseUrl?: string;
@@ -105,10 +107,18 @@ export function withDefaults(
     model,
     apiKey:
       provider === "openrouter"
-        ? input.apiKey || env.openrouterApiKey
+        ? input.apiKeyOpenrouter ||
+          input.apiKey ||
+          (input as any).apiKeyOpenrouter ||
+          env.openrouterApiKey
         : provider === "nanogpt"
-          ? input.apiKey || env.nanogptApiKey
+          ? input.apiKeyNanogpt ||
+            input.apiKey ||
+            (input as any).apiKeyNanogpt ||
+            env.nanogptApiKey
           : undefined,
+    apiKeyOpenrouter: input.apiKeyOpenrouter,
+    apiKeyNanogpt: input.apiKeyNanogpt,
     localUrl: input.localUrl || env.localUrl,
     nanoBaseUrl: env.nanogptBaseUrl,
     systemPrompt:

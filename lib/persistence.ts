@@ -10,6 +10,7 @@ export type StoredMessage = {
   error?: string;
   createdAt?: number;
   edited?: boolean;
+  cost?: number;
 };
 
 export type StoredChat = {
@@ -75,6 +76,7 @@ function getDb() {
         error TEXT,
         created_at INTEGER,
         edited INTEGER,
+        cost REAL,
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS config (
@@ -82,6 +84,11 @@ function getDb() {
         value TEXT
       );
     `);
+    try {
+      db.exec("ALTER TABLE messages ADD COLUMN cost REAL");
+    } catch {
+      // already added
+    }
     return db;
   } catch (error) {
     console.error("[persistence] failed to init db:", error);
@@ -125,7 +132,7 @@ export function getChat(id: string): StoredChat | null {
   if (!chatRow) return null;
   const messages = database
     .prepare(
-      `SELECT id, role, content, pending, error, created_at as createdAt, edited
+      `SELECT id, role, content, pending, error, created_at as createdAt, edited, cost
        FROM messages WHERE chat_id = :id ORDER BY created_at ASC`,
     )
     .all({ id })
@@ -137,6 +144,7 @@ export function getChat(id: string): StoredChat | null {
       error: row.error || undefined,
       createdAt: row.createdAt || undefined,
       edited: !!row.edited,
+      cost: typeof row.cost === "number" ? row.cost : undefined,
     })) as StoredMessage[];
 
   return {
@@ -166,8 +174,8 @@ export function saveChat(chat: StoredChat) {
   );
   const insertMessage = database.prepare(
     `INSERT INTO messages
-      (id, chat_id, role, content, pending, error, created_at, edited)
-     VALUES (:id, :chat_id, :role, :content, :pending, :error, :created_at, :edited)`,
+      (id, chat_id, role, content, pending, error, created_at, edited, cost)
+     VALUES (:id, :chat_id, :role, :content, :pending, :error, :created_at, :edited, :cost)`,
   );
 
   const tx = () => {
@@ -183,6 +191,7 @@ export function saveChat(chat: StoredChat) {
         error: msg.error || null,
         created_at: msg.createdAt ?? Date.now(),
         edited: msg.edited ? 1 : 0,
+        cost: msg.cost ?? null,
       });
     }
   };

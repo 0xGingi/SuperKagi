@@ -7,14 +7,21 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  let { provider, apiKey, localUrl } = body as {
-    provider?: string;
-    apiKey?: string;
-    localUrl?: string;
-  };
+  let { provider, apiKey, apiKeyOpenrouter, apiKeyNanogpt, localUrl } =
+    body as {
+      provider?: string;
+      apiKey?: string;
+      apiKeyOpenrouter?: string;
+      apiKeyNanogpt?: string;
+      localUrl?: string;
+    };
   const resolvedProvider = resolveProvider(provider);
   apiKey =
-    apiKey ||
+    (resolvedProvider === "openrouter"
+      ? apiKeyOpenrouter || apiKey
+      : resolvedProvider === "nanogpt"
+        ? apiKeyNanogpt || apiKey
+        : apiKey) ||
     (resolvedProvider === "openrouter"
       ? env.openrouterApiKey
       : env.nanogptApiKey);

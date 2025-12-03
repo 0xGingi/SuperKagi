@@ -10,6 +10,7 @@ import {
   withDefaults,
 } from "./env";
 import { callMcpTool, getMcpTools } from "./mcp";
+import { recordOpenrouterCost, type UsageRecord } from "./pricing";
 
 type IncomingMessage = {
   role: "user" | "assistant" | "tool";
@@ -25,10 +26,21 @@ type ChatPayload = {
   provider?: Provider;
   model?: string;
   apiKey?: string;
+  apiKeyOpenrouter?: string;
+  apiKeyNanogpt?: string;
   localUrl?: string;
   systemPrompt?: string;
   deepSearch?: boolean;
 };
+
+export type ChatResult = {
+  content: string;
+  cost?: number | null;
+  model?: string;
+  usage?: UsageRecord;
+};
+
+export type ChatMeta = Pick<ChatResult, "cost" | "model" | "usage">;
 
 function normalizeContent(content: any): any {
   if (content == null) return "";
@@ -105,10 +117,13 @@ function buildClient(config: NormalizedChatConfig) {
   return client;
 }
 
-export async function runChat(payload: ChatPayload): Promise<string> {
+export async function runChat(payload: ChatPayload): Promise<ChatResult> {
   const resolved = withDefaults(payload);
   const messages = sanitizeMessages(payload.messages, payload.systemPrompt);
   const client = buildClient(resolved);
+  let usage: UsageRecord | undefined;
+  let modelUsed: string = resolved.model;
+  let cost: number | null = null;
 
   let tools: ChatCompletionTool[] = [];
   if (payload.deepSearch) {
@@ -183,16 +198,37 @@ export async function runChat(payload: ChatPayload): Promise<string> {
     choice = response.choices[0];
   }
 
-  return choice?.message?.content ?? "[No content returned]";
+  usage = (response as any)?.usage as UsageRecord | undefined;
+  modelUsed = ((response as any)?.model as string | undefined) || resolved.model;
+
+  if (resolved.provider === "openrouter" && usage) {
+    const record = await recordOpenrouterCost({
+      model: modelUsed,
+      usage,
+      pricing: (response as any)?.pricing,
+      apiKey: resolved.apiKey,
+    });
+    cost = record?.cost ?? null;
+  }
+
+  return {
+    content: choice?.message?.content ?? "[No content returned]",
+    cost,
+    model: modelUsed,
+    usage,
+  };
 }
 
 export async function streamChat(
   payload: ChatPayload,
   onChunk: (text: string) => void,
-) {
+): Promise<ChatMeta> {
   const resolved = withDefaults(payload);
   const baseMessages = sanitizeMessages(payload.messages, payload.systemPrompt);
   const client = buildClient(resolved);
+  let latestUsage: UsageRecord | undefined;
+  let streamedModel: string | undefined;
+  let cost: number | null = null;
 
   let tools: ChatCompletionTool[] = [];
   if (payload.deepSearch) {
@@ -229,9 +265,12 @@ export async function streamChat(
       tools: tools.length ? tools : undefined,
       tool_choice: tools.length ? "auto" : undefined,
       stream: true,
+      stream_options: { include_usage: true } as any,
     } as any);
 
     for await (const chunk of s as any) {
+      if (chunk?.model) streamedModel = chunk.model;
+      if (chunk?.usage) latestUsage = chunk.usage as UsageRecord;
       const choice = chunk?.choices?.[0];
       if (!choice) continue;
       finishReason = choice.finish_reason || finishReason;
@@ -306,6 +345,21 @@ export async function streamChat(
     }
     break;
   }
+
+  if (resolved.provider === "openrouter" && latestUsage) {
+    const record = await recordOpenrouterCost({
+      model: streamedModel || resolved.model,
+      usage: latestUsage,
+      apiKey: resolved.apiKey,
+    });
+    cost = record?.cost ?? null;
+  }
+
+  return {
+    cost,
+    model: streamedModel || resolved.model,
+    usage: latestUsage,
+  };
 }
 
 function safeJsonParse(input: string) {
