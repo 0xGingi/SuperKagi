@@ -469,6 +469,25 @@ a {
   color: #7a1b1b;
 }
 
+.provider-error.info {
+  border-color: var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.provider-error .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-chip);
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  border: 1px solid var(--border);
+}
+
 .markdown-loading {
   color: var(--muted);
   font-size: 14px;
@@ -975,6 +994,11 @@ a {
   font-size: 12px;
 }
 
+.nano-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .nano-model-list {
   display: flex;
   flex-wrap: wrap;
@@ -1425,4 +1449,155 @@ a {
     padding: 0 12px;
     font-size: 14px;
   }
+}
+
+.pricing-page {
+  padding: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pricing-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.pricing-header h1 {
+  margin: 4px 0 6px;
+}
+
+.pricing-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.subhead {
+  margin: 0;
+  color: var(--muted);
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.pricing-card {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.pricing-card .label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pricing-card .value {
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.pricing-card .value.large {
+  font-size: 28px;
+}
+
+.pricing-card .hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pricing-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.panel-header h2 {
+  margin: 0;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip.ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.chip .meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pricing-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pricing-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 1.6fr 0.6fr 0.8fr 0.7fr;
+  padding: 10px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.pricing-row:last-child {
+  border-bottom: 0;
+}
+
+.pricing-row.head {
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.pricing-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.mono {
+  font-family: Menlo, Consolas, monospace;
+  font-size: 13px;
 }

@@ -196,6 +196,7 @@ const initialConfig: UiConfig = {
 };
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_MESSAGE_CHARS = 16000;
 
 function createMessageId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -332,6 +333,7 @@ export default function Page() {
   } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [deepSearchActive, setDeepSearchActive] = useState(false);
   const [nanoModels, setNanoModels] = useState<ModelOption[]>([]);
   const [nanoModelQuery, setNanoModelQuery] = useState("");
   const [nanoModelsStatus, setNanoModelsStatus] = useState("");
@@ -339,12 +341,18 @@ export default function Page() {
     "subscription" | "paid"
   >("subscription");
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
+  const [nanoModelsFetchedAt, setNanoModelsFetchedAt] = useState<number | null>(
+    null,
+  );
   const [openrouterModels, setOpenrouterModels] = useState<
     ModelOption[]
   >([]);
   const [openrouterModelQuery, setOpenrouterModelQuery] = useState("");
   const [openrouterModelsStatus, setOpenrouterModelsStatus] = useState("");
   const [openrouterModelsLoading, setOpenrouterModelsLoading] = useState(false);
+  const [openrouterModelsFetchedAt, setOpenrouterModelsFetchedAt] = useState<
+    number | null
+  >(null);
   const [hydrated, setHydrated] = useState(false);
   const [imageSettingsExpanded, setImageSettingsExpanded] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"settings" | "shortcuts">(
@@ -649,6 +657,37 @@ export default function Page() {
     setCustomShortcuts(loaded);
   }, []);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    const cached = safeParseLocal<{
+      models: ModelOption[];
+      fetchedAt: number;
+      scope: "subscription" | "paid";
+    }>(`nanoModelsCache-${nanoModelScope}`);
+    if (cached?.models?.length) {
+      setNanoModels(cached.models);
+      setNanoModelsFetchedAt(cached.fetchedAt || null);
+      setNanoModelsStatus(
+        `Loaded ${cached.models.length} models from cache (${new Date(cached.fetchedAt).toLocaleTimeString()}).`,
+      );
+    }
+  }, [hydrated, nanoModelScope]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const cached = safeParseLocal<{
+      models: ModelOption[];
+      fetchedAt: number;
+    }>("openrouterModelsCache");
+    if (cached?.models?.length) {
+      setOpenrouterModels(cached.models);
+      setOpenrouterModelsFetchedAt(cached.fetchedAt || null);
+      setOpenrouterModelsStatus(
+        `Loaded ${cached.models.length} models from cache (${new Date(cached.fetchedAt).toLocaleTimeString()}).`,
+      );
+    }
+  }, [hydrated]);
+
   // Merge custom shortcuts with defaults
   const activeShortcuts = useMemo(() => {
     const merged: Record<string, string> = {};
@@ -798,6 +837,7 @@ export default function Page() {
   }
 
   function buildPayload(messages: ChatMessage[]) {
+    const deepSearchEnabled = config.deepSearch;
     const apiKey = getProviderApiKey(config.provider);
     return {
       messages,
@@ -809,8 +849,8 @@ export default function Page() {
       localUrl: config.localUrl,
       systemPrompt:
         (config.systemPrompt || "") +
-        (config.deepSearch ? deepSearchPrompt : ""),
-      deepSearch: config.deepSearch,
+        (deepSearchEnabled ? deepSearchPrompt : ""),
+      deepSearch: deepSearchEnabled,
     };
   }
 
@@ -846,6 +886,12 @@ export default function Page() {
       }
     }
     if (!message && attachments.length === 0) return;
+    if (message.length > MAX_MESSAGE_CHARS) {
+      setProviderError(
+        `Message is too long. Limit to ${MAX_MESSAGE_CHARS.toLocaleString()} characters.`,
+      );
+      return;
+    }
 
     setProviderError(null);
     setHeroValue("");
@@ -894,6 +940,8 @@ export default function Page() {
     payload: any,
     targetAssistantId?: string,
   ) {
+    const shouldTrackDeep = !!payload?.deepSearch;
+    if (shouldTrackDeep) setDeepSearchActive(true);
     const controller = new AbortController();
     const stallAbortMs = config.deepSearch ? 120000 : 45000;
     let lastChunkAt = Date.now();
@@ -1006,6 +1054,7 @@ export default function Page() {
       await fallbackToSingle(chatId, payload, targetAssistantId);
     } finally {
       clearInterval(watchdog);
+      if (shouldTrackDeep) setDeepSearchActive(false);
     }
   }
 
@@ -1518,6 +1567,11 @@ export default function Page() {
   }
 
   async function fetchNanoModels() {
+    const key = getProviderApiKey("nanogpt");
+    if (!key) {
+      setNanoModelsStatus("Add a NanoGPT API key first.");
+      return;
+    }
     setNanoModelsLoading(true);
     const scope = nanoModelScope;
     setNanoModelsStatus(
@@ -1548,6 +1602,17 @@ export default function Page() {
         data?.models || data?.raw?.data || data?.raw || [],
       );
       setNanoModels(normalized);
+      setNanoModelsFetchedAt(Date.now());
+      try {
+        localStorage.setItem(
+          `nanoModelsCache-${scope}`,
+          JSON.stringify({
+            models: normalized,
+            fetchedAt: Date.now(),
+            scope,
+          }),
+        );
+      } catch {}
       setNanoModelsStatus(
         normalized.length
           ? `Loaded ${normalized.length} ${scope === "paid" ? "paid" : "subscription"} models.`
@@ -1564,13 +1629,18 @@ export default function Page() {
   }
 
   async function fetchOpenrouterModels() {
+    const key = getProviderApiKey("openrouter");
+    if (!key) {
+      setOpenrouterModelsStatus("Add an OpenRouter API key first.");
+      return;
+    }
     setOpenrouterModelsLoading(true);
     setOpenrouterModelsStatus("Fetching OpenRouter models…");
     try {
       const res = await fetch("/api/openrouter/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: getProviderApiKey("openrouter") }),
+        body: JSON.stringify({ apiKey: key }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1584,6 +1654,13 @@ export default function Page() {
         data?.models || data?.raw?.data || data?.raw || [],
       );
       setOpenrouterModels(normalized);
+      setOpenrouterModelsFetchedAt(Date.now());
+      try {
+        localStorage.setItem(
+          "openrouterModelsCache",
+          JSON.stringify({ models: normalized, fetchedAt: Date.now() }),
+        );
+      } catch {}
       setOpenrouterModelsStatus(
         normalized.length
           ? `Loaded ${normalized.length} models.`
@@ -1899,6 +1976,28 @@ export default function Page() {
             </svg>
             Export
           </button>
+          <a
+            className="chip w-full"
+            href="/pricing"
+            title="Pricing dashboard"
+            aria-label="Pricing dashboard"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 3h18v18H3z" />
+              <path d="M7 13h3v6H7z" />
+              <path d="M14 5h3v14h-3z" />
+            </svg>
+            Pricing
+          </a>
         </nav>
         <h3 className="section-title">Chats</h3>
         <ul className="chat-list" id="chat-list">
@@ -2061,6 +2160,12 @@ export default function Page() {
                 >
                   Dismiss
                 </button>
+              </div>
+            ) : null}
+            {deepSearchActive ? (
+              <div className="provider-error info" role="status">
+                <span>DeepSearch is running tools for this message…</span>
+                <span className="badge">MCP</span>
               </div>
             ) : null}
             {!isEmpty ? (
@@ -2492,9 +2597,17 @@ export default function Page() {
 
                         {config.provider === "nanogpt" && (
                             <div className="nano-models">
-                              <div className="nano-status">
-                                {nanoModelsStatus ||
-                                  "Uses your NanoGPT API key to load subscription models."}
+                            <div className="nano-status">
+                                <div>{nanoModelsStatus ||
+                                  "Uses your NanoGPT API key to load subscription models."}</div>
+                                {nanoModelsFetchedAt ? (
+                                  <div className="nano-meta">
+                                    Last fetched at{" "}
+                                    {new Date(
+                                      nanoModelsFetchedAt,
+                                    ).toLocaleTimeString()}
+                                  </div>
+                                ) : null}
                               </div>
                               <div className="nano-model-actions">
                                 <div className="segmented nano-scope-toggle">
@@ -2567,8 +2680,16 @@ export default function Page() {
                         {config.provider === "openrouter" && (
                           <div className="nano-models">
                             <div className="nano-status">
-                              {openrouterModelsStatus ||
-                                "Uses your OpenRouter API key to load available models."}
+                              <div>{openrouterModelsStatus ||
+                                "Uses your OpenRouter API key to load available models."}</div>
+                              {openrouterModelsFetchedAt ? (
+                                <div className="nano-meta">
+                                  Last fetched at{" "}
+                                  {new Date(
+                                    openrouterModelsFetchedAt,
+                                  ).toLocaleTimeString()}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="nano-model-actions">
                               <input
