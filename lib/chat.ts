@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions } from "openai";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
@@ -113,7 +113,6 @@ function buildClient(config: NormalizedChatConfig) {
           allowChatVariants: true,
         })
       : config.localUrl;
-  const apiKey = isOpenRouter || isNano ? config.apiKey : "no-key-needed";
   const defaultHeaders = isOpenRouter
     ? {
         "HTTP-Referer": env.appOrigin,
@@ -121,16 +120,20 @@ function buildClient(config: NormalizedChatConfig) {
       }
     : undefined;
 
-  const client = new OpenAI({
-    apiKey,
-    baseURL,
-    defaultHeaders,
-  });
+  const clientOptions: ClientOptions = { baseURL };
+  if (defaultHeaders) {
+    clientOptions.defaultHeaders = defaultHeaders;
+  }
+  if (isOpenRouter || isNano) {
+    clientOptions.apiKey = config.apiKey;
+  }
+
+  const client = new OpenAI(clientOptions);
   console.log("[chat] buildClient", {
     provider: config.provider,
     model: config.model,
     baseURL,
-    hasApiKey: !!apiKey,
+    hasApiKey: !!clientOptions.apiKey,
     hasHeaders: !!defaultHeaders,
   });
   return client;
