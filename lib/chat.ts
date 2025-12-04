@@ -10,7 +10,11 @@ import {
   withDefaults,
 } from "./env";
 import { callMcpTool, getMcpTools, warmMcpClient } from "./mcp";
-import { recordOpenrouterCost, type UsageRecord } from "./pricing";
+import {
+  recordNanogptCost,
+  recordOpenrouterCost,
+  type UsageRecord,
+} from "./pricing";
 
 if (env.kagiApiKey) {
   warmMcpClient();
@@ -213,6 +217,14 @@ export async function runChat(payload: ChatPayload): Promise<ChatResult> {
       apiKey: resolved.apiKey,
     });
     cost = record?.cost ?? null;
+  } else if (resolved.provider === "nanogpt" && usage) {
+    const record = await recordNanogptCost({
+      model: modelUsed,
+      usage,
+      pricing: (response as any)?.pricing,
+      apiKey: resolved.apiKey,
+    });
+    cost = record?.cost ?? null;
   }
 
   return {
@@ -354,6 +366,14 @@ export async function streamChat(
     const record = await recordOpenrouterCost({
       model: streamedModel || resolved.model,
       usage: latestUsage,
+      apiKey: resolved.apiKey,
+    });
+    cost = record?.cost ?? null;
+  } else if (resolved.provider === "nanogpt" && latestUsage) {
+    const record = await recordNanogptCost({
+      model: streamedModel || resolved.model,
+      usage: latestUsage,
+      pricing: undefined,
       apiKey: resolved.apiKey,
     });
     cost = record?.cost ?? null;

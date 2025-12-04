@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import type { Provider } from "@/lib/env";
+import { env } from "@/lib/env";
 import { getOpenrouterPricing } from "@/lib/openrouter";
 
 type PricingValue = number | string | null | undefined;
@@ -214,6 +215,152 @@ export async function recordOpenrouterCost(options: {
     });
   } catch (error) {
     console.warn("[pricing] failed to record OpenRouter cost:", error);
+    return null;
+  }
+}
+
+// -------- NanoGPT paid pricing --------
+
+const nanoPricingCache = new Map<
+  string,
+  { prompt: number | null; completion: number | null; currency: string }
+>();
+const NANO_CACHE_TTL = 10 * 60 * 1000;
+
+type NanoPricingEntry = {
+  id?: string;
+  model?: string;
+  pricing?: PricingShape;
+  price?: PricingShape;
+  cost_estimate?: number;
+  costEstimate?: number;
+  cost?: number;
+  currency?: string;
+};
+
+function normalizeNanoPricing(
+  entry: NanoPricingEntry | PricingShape | null | undefined,
+) {
+  if (!entry) return null;
+  const pricing =
+    (entry as NanoPricingEntry).pricing ||
+    (entry as NanoPricingEntry).price ||
+    (entry as PricingShape) || {
+      prompt: (entry as NanoPricingEntry).cost,
+      completion: (entry as NanoPricingEntry).cost,
+      currency: (entry as NanoPricingEntry).currency || "USD",
+    };
+  const { prompt, completion } = extractPricingFields(pricing);
+  const currency =
+    (typeof pricing === "object" && (pricing as any).currency) ||
+    (entry as any).currency ||
+    "USD";
+  if (prompt == null && completion == null) return null;
+  return { prompt, completion, currency };
+}
+
+async function fetchNanogptPricing(model: string, apiKey?: string) {
+  const cached = nanoPricingCache.get(model);
+  if (cached && Date.now() - (cached as any).cachedAt < NANO_CACHE_TTL) {
+    return cached;
+  }
+
+  const base = env.nanogptBaseUrl || "https://nano-gpt.com/v1";
+  const trimmed = base.replace(/\/+$/, "");
+  const root = trimmed
+    .replace(/\/api\/subscription\/v1$/i, "")
+    .replace(/\/v1$/i, "");
+  const url = `${root}/api/paid/v1/models?detailed=true`;
+
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey || env.nanogptApiKey || ""}` },
+    cache: "no-store",
+  });
+  if (!resp.ok) return null;
+  const data = (await resp.json()) as any;
+  const list: NanoPricingEntry[] = Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data)
+      ? data
+      : [];
+  const entry =
+    list.find(
+      (item) =>
+        item?.id === model ||
+        item?.model === model ||
+        (item as any)?.name === model ||
+        (item as any)?.model_id === model,
+    ) || null;
+  const normalized = normalizeNanoPricing(entry);
+  if (normalized) {
+    (normalized as any).cachedAt = Date.now();
+    nanoPricingCache.set(model, normalized as any);
+  }
+  return normalized;
+}
+
+export function calculateNanogptCost(
+  usage: UsageRecord | undefined,
+  pricing: NanoPricingEntry | PricingShape | null | undefined,
+) {
+  if (!usage) return null;
+  const normalized = normalizeNanoPricing(pricing);
+  if (!normalized) return null;
+  const { promptTokens, completionTokens } = (() => {
+    const normalizedUsage = normalizeUsage(usage);
+    if (normalizedUsage.prompt || normalizedUsage.completion) {
+      return {
+        promptTokens: normalizedUsage.prompt,
+        completionTokens: normalizedUsage.completion,
+      };
+    }
+    const half = Math.floor((normalizedUsage.total || 0) / 2);
+    return { promptTokens: half, completionTokens: normalizedUsage.total - half };
+  })();
+
+  const promptCost =
+    normalized.prompt != null ? (promptTokens * normalized.prompt) / 1_000_000 : 0;
+  const completionCost =
+    normalized.completion != null
+      ? (completionTokens * normalized.completion) / 1_000_000
+      : 0;
+  const totalCost = promptCost + completionCost;
+
+  return {
+    cost: totalCost,
+    promptTokens,
+    completionTokens,
+    currency: normalized.currency || "USD",
+  };
+}
+
+export async function recordNanogptCost(options: {
+  model: string;
+  usage?: UsageRecord;
+  pricing?: NanoPricingEntry | PricingShape | null;
+  apiKey?: string;
+}) {
+  try {
+    if (!options.model || !options.usage) return null;
+    const pricing =
+      options.pricing ||
+      (await fetchNanogptPricing(options.model, options.apiKey));
+    const costInfo = calculateNanogptCost(options.usage, pricing);
+    if (!costInfo) return null;
+
+    return insertCostEvent({
+      provider: "nanogpt",
+      model: options.model,
+      promptTokens: costInfo.promptTokens,
+      completionTokens: costInfo.completionTokens,
+      cost: costInfo.cost,
+      currency: costInfo.currency || "USD",
+      createdAt: Date.now(),
+      metadata:
+        pricing && typeof pricing === "object" ? { pricing } : undefined,
+    });
+  } catch (error) {
+    console.warn("[pricing] failed to record NanoGPT cost:", error);
     return null;
   }
 }

@@ -7,11 +7,11 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const nanoModelCache = new Map<CacheKey, CacheEntry>();
 
 function cacheKey(
-  apiKey: string,
+  credential: string,
   detailed: boolean,
-  scope: "subscription" | "all",
+  scope: "subscription" | "paid",
 ) {
-  return `${scope}::${apiKey || "none"}::${detailed ? "detailed" : "basic"}`;
+  return `${scope}::${credential || "none"}::${detailed ? "detailed" : "basic"}`;
 }
 
 export const runtime = "nodejs";
@@ -34,12 +34,24 @@ function buildAllModelsUrl() {
   return `${root}/api/models/text`;
 }
 
-function extractModels(data: any, scope: "subscription" | "all") {
-  if (scope === "all") {
+function buildPaidModelsUrl(detailed: boolean) {
+  const base = env.nanogptBaseUrl || "https://nano-gpt.com/v1";
+  const trimmed = base.replace(/\/+$/, "");
+  const root = trimmed
+    .replace(/\/api\/subscription\/v1$/i, "")
+    .replace(/\/v1$/i, "");
+  const url = `${root}/api/paid/v1/models`;
+  return detailed ? `${url}?detailed=true` : url;
+}
+
+function extractModels(data: any, scope: "subscription" | "paid") {
+  if (scope === "paid") {
+    if (Array.isArray(data?.data)) return data.data;
     const textModels = data?.models?.text;
     if (textModels && typeof textModels === "object") {
       return Object.values(textModels);
     }
+    if (Array.isArray(data)) return data;
   }
 
   return Array.isArray(data)
@@ -62,8 +74,13 @@ export async function POST(request: Request) {
   const apiKey =
     (body.apiKey as string | undefined)?.trim() || env.nanogptApiKey;
   const detailed = !!body.detailed;
-  const scope: "subscription" | "all" =
-    body.scope === "all" ? "all" : "subscription";
+  const scope: "subscription" | "paid" =
+    body.scope === "paid" ? "paid" : "subscription";
+  const paidToken =
+    (body.paidToken as string | undefined)?.trim() ||
+    process.env.NANOGPT_PAID_TOKEN ||
+    env.nanogptApiKey ||
+    "aad912bb-8424-4d85-bdf5-beb78278d7c7";
   const requireApiKey = scope === "subscription";
 
   if (requireApiKey && !apiKey) {
@@ -74,11 +91,11 @@ export async function POST(request: Request) {
   }
 
   const url =
-    scope === "all"
-      ? buildAllModelsUrl()
+    scope === "paid"
+      ? buildPaidModelsUrl(detailed)
       : buildModelsUrl() + (detailed ? "?detailed=true" : "");
   const key = cacheKey(
-    requireApiKey ? apiKey : "public",
+    scope === "subscription" ? apiKey : paidToken,
     detailed,
     scope,
   );
@@ -90,7 +107,10 @@ export async function POST(request: Request) {
 
   try {
     const resp = await fetch(url, {
-      headers: requireApiKey ? { "x-api-key": apiKey } : undefined,
+      headers:
+        scope === "subscription"
+          ? { "x-api-key": apiKey }
+          : { Authorization: `Bearer ${paidToken}` },
       cache: "no-store",
     });
     const text = await resp.text();

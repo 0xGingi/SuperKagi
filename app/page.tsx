@@ -49,6 +49,16 @@ export type ChatMessage = {
 
 export type ChatMap = Record<string, ChatMessage[]>;
 
+type ModelOption = {
+  id: string;
+  label: string;
+  pricing?: string;
+  pricePrompt?: number;
+  priceCompletion?: number;
+  priceUnit?: string;
+  priceCurrency?: string;
+};
+
 export type UiConfig = {
   provider: Provider;
   model: string;
@@ -322,17 +332,15 @@ export default function Page() {
   } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [nanoModels, setNanoModels] = useState<
-    { id: string; label: string; pricing?: string }[]
-  >([]);
+  const [nanoModels, setNanoModels] = useState<ModelOption[]>([]);
   const [nanoModelQuery, setNanoModelQuery] = useState("");
   const [nanoModelsStatus, setNanoModelsStatus] = useState("");
   const [nanoModelScope, setNanoModelScope] = useState<
-    "subscription" | "all"
+    "subscription" | "paid"
   >("subscription");
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
   const [openrouterModels, setOpenrouterModels] = useState<
-    { id: string; label: string; pricing?: string }[]
+    ModelOption[]
   >([]);
   const [openrouterModelQuery, setOpenrouterModelQuery] = useState("");
   const [openrouterModelsStatus, setOpenrouterModelsStatus] = useState("");
@@ -607,8 +615,8 @@ export default function Page() {
   useEffect(() => {
     if (config.provider === "nanogpt" && !nanoModelsStatus) {
       setNanoModelsStatus(
-        nanoModelScope === "all"
-          ? "Load all NanoGPT models (public list)."
+        nanoModelScope === "paid"
+          ? "Load paid NanoGPT models using your NanoGPT API key."
           : "Load subscription-only models using your NanoGPT API key.",
       );
     }
@@ -629,8 +637,8 @@ export default function Page() {
     setNanoModels([]);
     setNanoModelQuery("");
     setNanoModelsStatus(
-      nanoModelScope === "all"
-        ? "Load all NanoGPT models (public list)."
+      nanoModelScope === "paid"
+        ? "Load paid NanoGPT models using your NanoGPT API key."
         : "Load subscription-only models using your NanoGPT API key.",
     );
   }, [nanoModelScope, config.provider]);
@@ -1390,6 +1398,34 @@ export default function Page() {
     return "";
   }
 
+  function nanoPricingFields(model: any) {
+    const pricing =
+      (model && (model.pricing || model.prices || model.price)) || null;
+    if (!pricing || typeof pricing !== "object") {
+      return { prompt: undefined, completion: undefined, unit: undefined, currency: undefined };
+    }
+    const prompt =
+      pricing.prompt ??
+      pricing.input ??
+      pricing.input_text ??
+      pricing.request ??
+      pricing["1k_input"];
+    const completion =
+      pricing.completion ??
+      pricing.output ??
+      pricing.output_text ??
+      pricing.response ??
+      pricing["1k_output"];
+    const unit = pricing.unit || pricing.per || pricing.unit_label;
+    const currency = pricing.currency || pricing.curr || pricing.ccy;
+    return {
+      prompt: typeof prompt === "number" ? prompt : undefined,
+      completion: typeof completion === "number" ? completion : undefined,
+      unit: typeof unit === "string" ? unit : undefined,
+      currency: typeof currency === "string" ? currency : undefined,
+    };
+  }
+
   function formatOpenrouterPricing(model: any) {
     const pricing = model?.pricing || null;
     if (!pricing) return "";
@@ -1405,7 +1441,7 @@ export default function Page() {
 
   function normalizeNanoModels(
     list: any[],
-  ): { id: string; label: string; pricing?: string }[] {
+  ): ModelOption[] {
     if (!Array.isArray(list)) {
       if (list && typeof list === "object") {
         if ((list as any).text && typeof (list as any).text === "object") {
@@ -1427,14 +1463,23 @@ export default function Page() {
         if (!id) return null;
         const pricing = formatNanoPricing(item);
         const label = pricing ? `${id} · ${pricing}` : String(id);
-        return { id: String(id), label, pricing };
+        const priceFields = nanoPricingFields(item);
+        return {
+          id: String(id),
+          label,
+          pricing,
+          pricePrompt: priceFields.prompt,
+          priceCompletion: priceFields.completion,
+          priceUnit: priceFields.unit,
+          priceCurrency: priceFields.currency,
+        };
       })
-      .filter(Boolean) as { id: string; label: string; pricing?: string }[];
+      .filter(Boolean) as ModelOption[];
   }
 
   function normalizeOpenrouterModels(
     list: any[],
-  ): { id: string; label: string; pricing?: string }[] {
+  ): ModelOption[] {
     if (!Array.isArray(list)) return [];
     return list
       .map((item) => {
@@ -1445,7 +1490,7 @@ export default function Page() {
         const label = pricing ? `${id} · ${pricing}` : String(id);
         return { id: String(id), label, pricing };
       })
-      .filter(Boolean) as { id: string; label: string; pricing?: string }[];
+      .filter(Boolean) as ModelOption[];
   }
 
   function applyNanoModel(id: string) {
@@ -1476,15 +1521,16 @@ export default function Page() {
     setNanoModelsLoading(true);
     const scope = nanoModelScope;
     setNanoModelsStatus(
-      scope === "all"
-        ? "Fetching all NanoGPT models…"
+      scope === "paid"
+        ? "Fetching paid NanoGPT models…"
         : "Fetching NanoGPT subscription models…",
     );
     try {
-      const payload: Record<string, any> = { detailed: true, scope };
-      if (scope !== "all") {
-        payload.apiKey = getProviderApiKey("nanogpt");
-      }
+      const payload: Record<string, any> = {
+        detailed: true,
+        scope,
+        apiKey: getProviderApiKey("nanogpt"),
+      };
       const res = await fetch("/api/nanogpt/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1504,9 +1550,9 @@ export default function Page() {
       setNanoModels(normalized);
       setNanoModelsStatus(
         normalized.length
-          ? `Loaded ${normalized.length} ${scope === "all" ? "total" : "subscription"} models.`
-          : scope === "all"
-            ? "No models returned from public list."
+          ? `Loaded ${normalized.length} ${scope === "paid" ? "paid" : "subscription"} models.`
+          : scope === "paid"
+            ? "No models returned. Check NanoGPT API key."
             : "No models returned. Check subscription/API key.",
       );
     } catch (error) {
@@ -2464,11 +2510,11 @@ export default function Page() {
                                   <button
                                     type="button"
                                     className={clsx("seg", {
-                                      active: nanoModelScope === "all",
+                                      active: nanoModelScope === "paid",
                                     })}
-                                    onClick={() => setNanoModelScope("all")}
+                                    onClick={() => setNanoModelScope("paid")}
                                   >
-                                    All
+                                    Paid
                                   </button>
                                 </div>
                                 <input
