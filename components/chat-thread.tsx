@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import Image from "next/image";
 import type { RefObject } from "react";
 
 import { MarkdownRenderer } from "@/components/markdown-renderer";
@@ -47,6 +48,17 @@ function _messageText(content: ChatMessage["content"]): string {
   return content || "";
 }
 
+function sanitizeUrl(value: string): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  return /^(https?:|data:|blob:)/i.test(trimmed) ? trimmed : "";
+}
+
+function sanitizeFilename(value?: string): string {
+  if (!value) return "";
+  return value.trim().replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 export function ChatThread({
   thread,
   visibleThread,
@@ -74,31 +86,33 @@ export function ChatThread({
 }: Props) {
   async function downloadImage(url: string) {
     try {
-      const filename =
-        url.split("/").pop()?.split("?")[0] ||
-        `image-${Date.now()}.png`;
-      const isDataUrl = url.startsWith("data:");
-      if (isDataUrl) {
+      const safeUrl = sanitizeUrl(url);
+      if (!safeUrl) throw new Error("Invalid download URL");
+      const baseName =
+        safeUrl.split("/").pop()?.split("?")[0] || `image-${Date.now()}.png`;
+      const safeFilename = sanitizeFilename(baseName) || "generated-image.png";
+      const normalizedUrl = safeUrl.toLowerCase();
+      if (
+        normalizedUrl.startsWith("data:") ||
+        normalizedUrl.startsWith("blob:")
+      ) {
         const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
+        link.href = safeUrl;
+        link.download = safeFilename;
+        link.rel = "noopener noreferrer";
         link.click();
-        document.body.removeChild(link);
         return;
       }
 
-      const resp = await fetch(url, { mode: "cors" });
+      const resp = await fetch(safeUrl, { mode: "cors" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const blob = await resp.blob();
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = filename;
+      link.download = safeFilename;
       link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
       URL.revokeObjectURL(objectUrl);
     } catch (err) {
       console.warn("Download failed", err);
@@ -128,12 +142,15 @@ export function ChatThread({
               className="generated-image-wrap"
               style={{ position: "relative" }}
             >
-              <img
+              <Image
                 src={part.image_url.url}
                 alt="Generated content"
                 className="generated-image"
                 loading="lazy"
-                decoding="async"
+                width={640}
+                height={640}
+                sizes="100vw"
+                unoptimized
               />
               <div className="generated-image-actions">
                 <button
@@ -264,7 +281,7 @@ export function ChatThread({
               ) : (
                 <>
                   {showReasoning && msg.reasoning ? (
-                    <div
+                    <section
                       className="reasoning-block"
                       aria-label="Model reasoning"
                     >
@@ -273,7 +290,7 @@ export function ChatThread({
                         content={msg.reasoning}
                         className="reasoning-markdown"
                       />
-                    </div>
+                    </section>
                   ) : null}
                   {renderMessageContent(msg)}
                   {msg.pending ? (

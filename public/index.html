@@ -297,9 +297,46 @@
       { id: "qwen-image", name: "Qwen Image", pricing: "$0.009/img", resolutions: ["1024x1024", "1280x720", "720x1280"] },
     ];
 
-    let currentChatId = localStorage.getItem('currentChatId') || Date.now().toString();
-    const chats = JSON.parse(localStorage.getItem('chats') || '{}');
-    let config = JSON.parse(localStorage.getItem('config') || '{}');
+    function parseJson(value) {
+      try {
+        return value ? JSON.parse(value) : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function sanitizeChatId(value) {
+      if (typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      return /^\d+$/.test(trimmed) ? trimmed : '';
+    }
+
+    function normalizeChats(raw) {
+      const normalized = Object.create(null);
+      if (!raw || typeof raw !== 'object') return normalized;
+      for (const key of Object.keys(raw)) {
+        if (!/^\d+$/.test(key)) continue;
+        const entry = raw[key];
+        if (!Array.isArray(entry)) continue;
+        normalized[key] = entry.slice();
+      }
+      return normalized;
+    }
+
+    function getInitialChatId(preferred, storedChats) {
+      const safePreferred = sanitizeChatId(preferred);
+      if (safePreferred && storedChats[safePreferred]) return safePreferred;
+      const existingIds = Object.keys(storedChats).sort().reverse();
+      if (existingIds.length) return existingIds[0];
+      const newId = Date.now().toString();
+      storedChats[newId] = [];
+      return newId;
+    }
+
+    const chats = normalizeChats(parseJson(localStorage.getItem('chats')));
+    let currentChatId = getInitialChatId(localStorage.getItem('currentChatId'), chats);
+    localStorage.setItem('currentChatId', currentChatId);
+    let config = parseJson(localStorage.getItem('config'));
     let attachments = [];
     let isGeneratingImage = false;
 
@@ -322,31 +359,147 @@
       document.getElementById('image-seed').value = '';
     }
 
+    function sanitizeUrl(value) {
+      if (typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      return /^(https?:|data:|blob:)/i.test(trimmed) ? trimmed : '';
+    }
+
+    function sanitizeFilename(value) {
+      if (typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      const sanitized = trimmed.replace(/[^a-zA-Z0-9._-]/g, '_');
+      return sanitized || '';
+    }
+
     async function downloadImage(url, filename) {
+      const safeUrl = sanitizeUrl(url);
+      if (!safeUrl) throw new Error('Invalid download URL');
+      const safeFilename = sanitizeFilename(filename) || 'generated-image.png';
+      const normalizedUrl = safeUrl.toLowerCase();
       try {
-        if (url.startsWith('data:')) {
+        if (normalizedUrl.startsWith('data:') || normalizedUrl.startsWith('blob:')) {
           const link = document.createElement('a');
-          link.href = url;
-          link.download = filename || 'generated-image.png';
-          document.body.appendChild(link);
+          link.href = safeUrl;
+          link.download = safeFilename;
           link.click();
-          document.body.removeChild(link);
         } else {
-          const response = await fetch(url);
+          const response = await fetch(safeUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
           const blobUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = blobUrl;
-          link.download = filename || 'generated-image.png';
-          document.body.appendChild(link);
+          link.download = safeFilename;
           link.click();
-          document.body.removeChild(link);
           URL.revokeObjectURL(blobUrl);
         }
       } catch (e) {
         console.error('Download failed:', e);
         alert('Failed to download image: ' + (e.message || e));
       }
+    }
+
+    function createTypingIndicator() {
+      const container = document.createElement('span');
+      container.className = 'typing-dots';
+      for (let i = 0; i < 3; i += 1) {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        container.appendChild(dot);
+      }
+      return container;
+    }
+
+    const inlinePatterns = [
+      { type: 'link', regex: /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/ },
+      { type: 'bold', regex: /\*\*(.+?)\*\*/ },
+      { type: 'code', regex: /`([^`]+?)`/ },
+    ];
+
+    function createInlineNodes(text) {
+      const fragment = document.createDocumentFragment();
+      let remaining = text || '';
+      while (remaining) {
+        let earliest = null;
+        for (const rule of inlinePatterns) {
+          rule.regex.lastIndex = 0;
+          const match = rule.regex.exec(remaining);
+          if (match) {
+            if (!earliest || match.index < earliest.match.index) {
+              earliest = { rule, match };
+            }
+          }
+        }
+        if (!earliest) break;
+        if (earliest.match.index > 0) {
+          fragment.appendChild(document.createTextNode(remaining.slice(0, earliest.match.index)));
+        }
+        const { rule, match } = earliest;
+        if (rule.type === 'link') {
+          const linkText = match[1];
+          const linkUrl = sanitizeUrl(match[2]);
+          const a = document.createElement('a');
+          a.textContent = linkText;
+          if (linkUrl) {
+            a.href = linkUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+          }
+          fragment.appendChild(a);
+        } else if (rule.type === 'bold') {
+          const strong = document.createElement('strong');
+          strong.appendChild(createInlineNodes(match[1]));
+          fragment.appendChild(strong);
+        } else if (rule.type === 'code') {
+          const code = document.createElement('code');
+          code.textContent = match[1];
+          fragment.appendChild(code);
+        }
+        remaining = remaining.slice(earliest.match.index + earliest.match[0].length);
+      }
+      if (remaining) {
+        fragment.appendChild(document.createTextNode(remaining));
+      }
+      return fragment;
+    }
+
+    function createMarkdownFragment(text) {
+      const fragment = document.createDocumentFragment();
+      const lines = (text || '').split(/\r?\n/);
+      lines.forEach((line, index) => {
+        if (index > 0) {
+          fragment.appendChild(document.createElement('br'));
+        }
+        fragment.appendChild(createInlineNodes(line));
+      });
+      return fragment;
+    }
+
+    function createDownloadIcon() {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', '16');
+      svg.setAttribute('height', '16');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      const path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('d', 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4');
+      const polyline = document.createElementNS(svgNS, 'polyline');
+      polyline.setAttribute('points', '7 10 12 15 17 10');
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', '12');
+      line.setAttribute('y1', '15');
+      line.setAttribute('x2', '12');
+      line.setAttribute('y2', '3');
+      svg.appendChild(path);
+      svg.appendChild(polyline);
+      svg.appendChild(line);
+      return svg;
     }
 
     let serverDefaults = null;
@@ -555,13 +708,23 @@
       const picker = document.getElementById('image-model-picker');
       if (!picker) return;
       const currentModel = document.getElementById('image-model').value || 'chroma';
-      picker.innerHTML = '';
+      picker.replaceChildren();
       nanoImageModels.forEach(m => {
         const pill = document.createElement('button');
         pill.type = 'button';
         pill.className = 'chip' + (m.id === currentModel ? ' primary' : '');
         pill.style.cssText = 'font-size: 12px; padding: 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 80px;';
-        pill.innerHTML = `<span style="font-weight: 600;">${m.name}</span><span style="opacity: 0.7; font-size: 10px;">${m.pricing}</span>`;
+
+        const title = document.createElement('span');
+        title.style.fontWeight = '600';
+        title.textContent = m.name;
+        const pricing = document.createElement('span');
+        pricing.style.opacity = '0.7';
+        pricing.style.fontSize = '10px';
+        pricing.textContent = m.pricing;
+        pill.appendChild(title);
+        pill.appendChild(pricing);
+
         pill.title = `${m.name} - Resolutions: ${m.resolutions.join(', ')}`;
         pill.onclick = () => selectImageModel(m.id);
         picker.appendChild(pill);
@@ -616,35 +779,68 @@
 
     function loadChatList() {
       const list = document.getElementById('chat-list');
-      list.innerHTML = '';
+      if (!list) return;
+      list.replaceChildren();
       const q = (document.getElementById('chat-search')?.value || '').toLowerCase();
       Object.keys(chats).sort().reverse().forEach(id => {
-        const last = (chats[id] || []).slice().reverse().find(m => m.role === 'user');
+        const safeId = sanitizeChatId(id);
+        if (!safeId) return;
+        const last = (chats[safeId] || []).slice().reverse().find(m => m.role === 'user');
         let labelText = '';
         if (Array.isArray(last?.content)) {
-          labelText = last.content.map(p => p.text || (p.image_url ? '[image]' : '')).join(' ').trim();
+          labelText = last.content.map(p => {
+            if (!p) return '';
+            if (p.type === 'text') return p.text || '';
+            if (p.type === 'image_url') return '[image]';
+            return '';
+          }).join(' ').trim();
         } else {
-          labelText = last?.content || '';
+          labelText = typeof last?.content === 'string' ? last.content : '';
         }
-        const label = (labelText || `Chat ${id.slice(-4)}`).slice(0, 40);
+        const label = (labelText || `Chat ${safeId.slice(-4)}`).slice(0, 40);
         if (q && !label.toLowerCase().includes(q)) return;
+
         const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="chat-item ${id === currentChatId ? 'active' : ''}" title="${label.replace(/"/g, '&quot;')}">
-            <div>
-              <span class="chat-title">${label}</span>
-              <span class="chat-meta">${new Date(parseInt(id, 10)).toLocaleDateString()}</span>
-            </div>
-            <button class="mini-btn" title="Delete" onclick="deleteChat('${id}'); event.stopPropagation();">Delete</button>
-          </div>`;
-        li.onclick = () => switchChat(id);
+        const chatItem = document.createElement('div');
+        chatItem.className = `chat-item ${safeId === currentChatId ? 'active' : ''}`.trim();
+        chatItem.title = label;
+
+        const info = document.createElement('div');
+        const chatTitle = document.createElement('span');
+        chatTitle.className = 'chat-title';
+        chatTitle.textContent = label;
+        const chatMeta = document.createElement('span');
+        chatMeta.className = 'chat-meta';
+        const timestamp = Number.parseInt(safeId, 10);
+        chatMeta.textContent = Number.isNaN(timestamp)
+          ? new Date().toLocaleDateString()
+          : new Date(timestamp).toLocaleDateString();
+        info.appendChild(chatTitle);
+        info.appendChild(chatMeta);
+        chatItem.appendChild(info);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'mini-btn';
+        deleteBtn.type = 'button';
+        deleteBtn.title = 'Delete';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          deleteChat(safeId);
+        });
+        chatItem.appendChild(deleteBtn);
+
+        li.appendChild(chatItem);
+        li.addEventListener('click', () => switchChat(safeId));
         list.appendChild(li);
       });
     }
 
     function switchChat(id) {
-      currentChatId = id;
-      localStorage.setItem('currentChatId', id);
+      const safeId = sanitizeChatId(id);
+      if (!safeId || !chats[safeId]) return;
+      currentChatId = safeId;
+      localStorage.setItem('currentChatId', safeId);
       renderChat();
       loadChatList();
     }
@@ -668,10 +864,11 @@
     }
 
     function deleteChat(id) {
-      if (!chats[id]) return;
+      const safeId = sanitizeChatId(id);
+      if (!safeId || !chats[safeId]) return;
       if (!confirm('Delete this chat?')) return;
-      delete chats[id];
-      if (currentChatId === id) {
+      delete chats[safeId];
+      if (currentChatId === safeId) {
         const ids = Object.keys(chats).sort().reverse();
         currentChatId = ids[0] || Date.now().toString();
         if (!chats[currentChatId]) chats[currentChatId] = [];
@@ -690,45 +887,60 @@
       const area = document.getElementById('chat-area');
       const hero = document.getElementById('hero');
       const composer = document.querySelector('.composer');
-      area.innerHTML = '';
+      if (!area) return;
+      area.replaceChildren();
       const thread = chats[currentChatId] || [];
       const isEmpty = thread.length === 0;
-      hero.style.display = isEmpty ? 'flex' : 'none';
+      if (hero) hero.style.display = isEmpty ? 'flex' : 'none';
       if (composer) composer.style.display = isEmpty ? 'none' : 'grid';
       thread.forEach((msg, msgIdx) => {
+        const role = typeof msg.role === 'string' ? msg.role : 'assistant';
         const div = document.createElement('div');
-        div.className = `message ${msg.role}`;
+        div.className = ['message', role].join(' ');
         const bubble = document.createElement('div');
-        bubble.className = `bubble ${msg.role} ${msg.pending ? 'typing' : ''}`;
+        const bubbleClasses = ['bubble', role];
+        if (msg.pending) bubbleClasses.push('typing');
+        bubble.className = bubbleClasses.join(' ');
         if (msg.pending) {
-          bubble.innerHTML = '<span class="typing-dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+          bubble.appendChild(createTypingIndicator());
         } else {
-          if (Array.isArray(msg.content)) {
-            let html = '';
-            msg.content.forEach((part, partIdx) => {
-              if (part.type === 'text' || part.text) {
-                html += renderMD(part.text || '');
-              } else if (part.type === 'image_url' && part.image_url?.url) {
-                const imgId = part.image_url.id || `img-${msgIdx}-${partIdx}`;
-                const imgUrl = part.image_url.url;
-                html += `<div class="image-container">
-                  <img src="${imgUrl}" alt="Generated image" />
-                  <div class="image-actions">
-                    <button class="image-action-btn" onclick="downloadImage('${imgUrl.replace(/'/g, "\\'")}', 'generated-${imgId}.png')" title="Download image">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                      </svg>
-                      Download
-                    </button>
-                  </div>
-                </div>`;
+          const content = msg.content;
+          if (Array.isArray(content)) {
+            content.forEach((part, partIdx) => {
+              if (!part) return;
+              if (part.type === 'image_url' && part.image_url && typeof part.image_url.url === 'string') {
+                const sanitizedUrl = sanitizeUrl(part.image_url.url);
+                if (!sanitizedUrl) return;
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'image-container';
+                const img = document.createElement('img');
+                img.className = 'generated-image';
+                img.src = sanitizedUrl;
+                img.alt = 'Generated image';
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                imageContainer.appendChild(img);
+                const actions = document.createElement('div');
+                actions.className = 'image-actions';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'image-action-btn';
+                btn.title = 'Download image';
+                btn.appendChild(createDownloadIcon());
+                btn.appendChild(document.createTextNode('Download'));
+                const downloadNameId = sanitizeFilename(part.image_url.id || '');
+                const baseId = downloadNameId || `img-${msgIdx}-${partIdx}`;
+                const fileName = `generated-${baseId}.png`;
+                btn.addEventListener('click', () => downloadImage(sanitizedUrl, fileName));
+                actions.appendChild(btn);
+                imageContainer.appendChild(actions);
+                bubble.appendChild(imageContainer);
+              } else if (typeof part.text === 'string') {
+                bubble.appendChild(createMarkdownFragment(part.text));
               }
             });
-            bubble.innerHTML = html || '';
-          } else {
-            bubble.innerHTML = renderMD(msg.content || '');
+          } else if (typeof content === 'string') {
+            bubble.appendChild(createMarkdownFragment(content));
           }
         }
         div.appendChild(bubble);
@@ -984,31 +1196,6 @@
       el?.focus();
     }
 
-    function renderMarkdown(text) {
-      const esc = (s) => s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-      let html = '';
-      const parts = (text + '\n').split(/```/);
-      for (let i = 0; i < parts.length; i++) {
-        if (i % 2 === 0) {
-          const p = parts[i]
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/`([^`]+?)`/g, '<code>$1</code>');
-          html += esc(p).replace(/\n/g, '<br/>');
-        } else {
-          const seg = parts[i];
-          const nl = seg.indexOf('\n');
-          const lang = nl === -1 ? '' : esc(seg.slice(0, nl).trim());
-          const code = nl === -1 ? seg : seg.slice(nl + 1);
-          html += `<pre><code class="lang-${lang}">${esc(code)}</code></pre>`;
-        }
-      }
-      return html;
-    }
-
     function toggleSidebar(force) {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.getElementById('sidebar-overlay');
@@ -1047,102 +1234,6 @@
     };
     (document.getElementById('sidebar-overlay') || {}).onclick = () => toggleSidebar(false);
 
-    function renderMD(text) {
-      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-      function renderInline(segment) {
-        const linkRE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-        let out = '';
-        let last = 0; let m;
-        while ((m = linkRE.exec(segment)) !== null) {
-          out += esc(segment.slice(last, m.index));
-          const t = esc(m[1]);
-          const u = esc(m[2]);
-          out += `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`;
-          last = m.index + m[0].length;
-        }
-        out += esc(segment.slice(last));
-        out = out
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/`([^`]+?)`/g, '<code>$1</code>');
-        out = out.replace(/&lt;br\/?&gt;/g, '<br/>');
-        return out;
-      }
-
-      function renderBlock(blockText) {
-        const lines = blockText.replace(/\r\n/g, '\n').split('\n');
-        let html = '';
-        let inList = false;
-        const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
-
-        function splitCells(line) {
-          const trimmed = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '');
-          return trimmed.split('|');
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const raw = lines[i];
-          const line = raw.trimEnd();
-          if (!line.trim()) {
-            closeList();
-            continue;
-          }
-          if (line.startsWith('|')) {
-            const next = (lines[i + 1] || '').trim();
-            if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next)) {
-              const headers = splitCells(line);
-              i++; // skip separator
-              closeList();
-              html += '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
-              headers.forEach(h => { html += `<th>${renderInline(h.trim())}</th>`; });
-              html += '</tr></thead><tbody>';
-              while (i + 1 < lines.length && lines[i + 1].trim().startsWith('|')) {
-                i++;
-                const cells = splitCells(lines[i].trim());
-                html += '<tr>';
-                for (let c = 0; c < headers.length; c++) {
-                  html += `<td>${renderInline((cells[c] || '').trim())}</td>`;
-                }
-                html += '</tr>';
-              }
-              html += '</tbody></table></div>';
-              continue;
-            }
-          }
-          const h = line.match(/^#{1,6}\s+(.*)$/);
-          if (h) {
-            closeList();
-            const level = Math.min(6, line.indexOf(' '));
-            html += `<h${level}>${renderInline(h[1])}</h${level}>`;
-            continue;
-          }
-          const li = line.match(/^[-*]\s+(.*)$/);
-          if (li) {
-            if (!inList) { html += '<ul>'; inList = true; }
-            html += `<li>${renderInline(li[1])}</li>`;
-            continue;
-          }
-          closeList();
-          html += `<p>${renderInline(line)}</p>`;
-        }
-        closeList();
-        return html;
-      }
-
-      let html = '';
-      const parts = (text || '').split(/```/);
-      for (let i = 0; i < parts.length; i++) {
-        if (i % 2 === 0) {
-          html += renderBlock(parts[i]);
-        } else {
-          const seg = parts[i];
-          const nl = seg.indexOf('\n');
-          const lang = nl === -1 ? '' : seg.slice(0, nl).trim();
-          const code = nl === -1 ? seg : seg.slice(nl + 1);
-          html += `<pre><code class="lang-${esc(lang)}">${esc(code)}</code></pre>`;
-        }
-      }
-      return html;
-    }
 
     (async function init() {
       const env = await getServerDefaults();
@@ -1291,12 +1382,24 @@
       hostIds.forEach(id => {
         const host = document.getElementById(id);
         if (!host) return;
-        host.innerHTML = '';
+        host.replaceChildren();
         attachments.forEach((a, idx) => {
           const chip = document.createElement('span');
           chip.className = 'attach-chip';
           const ext = a.kind === 'image' ? 'image' : (extOf(a.name) || a.kind);
-          chip.innerHTML = `<span class="ext">${ext}</span> ${a.name} <button title="Remove" onclick="removeAttachment(${idx})">×</button>`;
+          const extSpan = document.createElement('span');
+          extSpan.className = 'ext';
+          extSpan.textContent = ext;
+          chip.appendChild(extSpan);
+          chip.appendChild(document.createTextNode(' '));
+          chip.appendChild(document.createTextNode(a.name));
+          chip.appendChild(document.createTextNode(' '));
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.title = 'Remove';
+          removeBtn.textContent = '×';
+          removeBtn.addEventListener('click', () => removeAttachment(idx));
+          chip.appendChild(removeBtn);
           host.appendChild(chip);
         });
       });

@@ -1227,7 +1227,7 @@ export default function Page() {
           : "";
     if (!text) return null;
     const match = text.match(/\[image\]\s*(?:generate|edit):\s*(.+)/i);
-    if (match && match[1]) return match[1].trim();
+    if (match?.[1]) return match[1].trim();
     return null;
   }
 
@@ -1267,8 +1267,7 @@ export default function Page() {
 
     const normalizedPrompt = prompt?.trim();
     if (!normalizedPrompt) {
-      const errorMsg =
-        "Unable to regenerate image: original prompt not found.";
+      const errorMsg = "Unable to regenerate image: original prompt not found.";
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
         const idx = thread.findIndex((m) => m.id === pendingId);
@@ -1829,7 +1828,7 @@ export default function Page() {
       "requiresSwapAndTargetImages",
     ];
     for (const key of flagKeys) {
-      if (Boolean((model as any)[key])) return true;
+      if ((model as any)[key]) return true;
     }
 
     const normalizedList = [
@@ -1858,8 +1857,7 @@ export default function Page() {
       if (normalized) tags.add(normalized);
     };
     if (Array.isArray(model?.tags)) model.tags.forEach(addTag);
-    if (Array.isArray(model?.capabilities))
-      model.capabilities.forEach(addTag);
+    if (Array.isArray(model?.capabilities)) model.capabilities.forEach(addTag);
     addTag(model?.iconLabel);
     addTag(model?.category);
     addTag(model?.provider);
@@ -2333,7 +2331,7 @@ export default function Page() {
     return nanoImageModels.filter(
       (m) =>
         m.id.toLowerCase().includes(q) ||
-        (m.label && m.label.toLowerCase().includes(q)) ||
+        m.label?.toLowerCase().includes(q) ||
         (m.tags?.some((tag) => tag.includes(q)) ?? false),
     );
   }, [nanoImageModels, nanoImageModelQuery]);
@@ -2381,10 +2379,9 @@ export default function Page() {
   }, [nanoImageModels, config.imageModel]);
 
   const imageResolutionOptions = useMemo(() => {
-    const base =
-      activeImageModel?.resolutions && activeImageModel.resolutions.length
-        ? activeImageModel.resolutions
-        : defaultImageResolutions;
+    const base = activeImageModel?.resolutions?.length
+      ? activeImageModel.resolutions
+      : defaultImageResolutions;
     const unique = new Set<string>();
     base.forEach((r) => {
       if (typeof r === "string" && r.trim()) unique.add(r);
