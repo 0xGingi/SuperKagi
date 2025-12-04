@@ -4,6 +4,7 @@ import path from "node:path";
 
 import type { Provider } from "@/lib/env";
 import { env } from "@/lib/env";
+import { getNanoPaidModelsUrl } from "@/lib/nanogpt";
 import { getOpenrouterPricing } from "@/lib/openrouter";
 
 type PricingValue = number | string | null | undefined;
@@ -242,8 +243,7 @@ function normalizeNanoPricing(
   entry: NanoPricingEntry | PricingShape | null | undefined,
 ) {
   if (!entry) return null;
-  const pricing =
-    (entry as NanoPricingEntry).pricing ||
+  const pricing = (entry as NanoPricingEntry).pricing ||
     (entry as NanoPricingEntry).price ||
     (entry as PricingShape) || {
       prompt: (entry as NanoPricingEntry).cost,
@@ -265,12 +265,7 @@ async function fetchNanogptPricing(model: string, apiKey?: string) {
     return cached;
   }
 
-  const base = env.nanogptBaseUrl || "https://nano-gpt.com/v1";
-  const trimmed = base.replace(/\/+$/, "");
-  const root = trimmed
-    .replace(/\/api\/subscription\/v1$/i, "")
-    .replace(/\/v1$/i, "");
-  const url = `${root}/api/paid/v1/models?detailed=true`;
+  const url = getNanoPaidModelsUrl(true, env.nanogptBaseUrl);
 
   const resp = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey || env.nanogptApiKey || ""}` },
@@ -315,11 +310,16 @@ export function calculateNanogptCost(
       };
     }
     const half = Math.floor((normalizedUsage.total || 0) / 2);
-    return { promptTokens: half, completionTokens: normalizedUsage.total - half };
+    return {
+      promptTokens: half,
+      completionTokens: normalizedUsage.total - half,
+    };
   })();
 
   const promptCost =
-    normalized.prompt != null ? (promptTokens * normalized.prompt) / 1_000_000 : 0;
+    normalized.prompt != null
+      ? (promptTokens * normalized.prompt) / 1_000_000
+      : 0;
   const completionCost =
     normalized.completion != null
       ? (completionTokens * normalized.completion) / 1_000_000
@@ -363,6 +363,26 @@ export async function recordNanogptCost(options: {
     console.warn("[pricing] failed to record NanoGPT cost:", error);
     return null;
   }
+}
+
+export function recordGenericCost(options: {
+  provider: Provider;
+  model: string;
+  cost: number;
+  currency?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  if (options.cost == null || Number.isNaN(options.cost)) return null;
+  return insertCostEvent({
+    provider: options.provider,
+    model: options.model,
+    promptTokens: 0,
+    completionTokens: 0,
+    cost: options.cost,
+    currency: options.currency || "USD",
+    createdAt: Date.now(),
+    metadata: options.metadata,
+  });
 }
 
 export function listRecentCosts(limit = 50): CostEvent[] {

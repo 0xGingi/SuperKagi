@@ -11,6 +11,8 @@ export type StoredMessage = {
   createdAt?: number;
   edited?: boolean;
   cost?: number;
+  reasoning?: string;
+  reasoningDetails?: unknown;
 };
 
 export type StoredChat = {
@@ -77,6 +79,8 @@ function getDb() {
         created_at INTEGER,
         edited INTEGER,
         cost REAL,
+        reasoning TEXT,
+        reasoning_details TEXT,
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS config (
@@ -86,6 +90,16 @@ function getDb() {
     `);
     try {
       db.exec("ALTER TABLE messages ADD COLUMN cost REAL");
+    } catch {
+      // already added
+    }
+    try {
+      db.exec("ALTER TABLE messages ADD COLUMN reasoning TEXT");
+    } catch {
+      // already added
+    }
+    try {
+      db.exec("ALTER TABLE messages ADD COLUMN reasoning_details TEXT");
     } catch {
       // already added
     }
@@ -132,7 +146,7 @@ export function getChat(id: string): StoredChat | null {
   if (!chatRow) return null;
   const messages = database
     .prepare(
-      `SELECT id, role, content, pending, error, created_at as createdAt, edited, cost
+      `SELECT id, role, content, pending, error, created_at as createdAt, edited, cost, reasoning, reasoning_details
        FROM messages WHERE chat_id = :id ORDER BY created_at ASC`,
     )
     .all({ id })
@@ -145,6 +159,10 @@ export function getChat(id: string): StoredChat | null {
       createdAt: row.createdAt || undefined,
       edited: !!row.edited,
       cost: typeof row.cost === "number" ? row.cost : undefined,
+      reasoning: row.reasoning || undefined,
+      reasoningDetails: row.reasoning_details
+        ? safeJsonParse(row.reasoning_details)
+        : undefined,
     })) as StoredMessage[];
 
   return {
@@ -174,8 +192,8 @@ export function saveChat(chat: StoredChat) {
   );
   const insertMessage = database.prepare(
     `INSERT INTO messages
-      (id, chat_id, role, content, pending, error, created_at, edited, cost)
-     VALUES (:id, :chat_id, :role, :content, :pending, :error, :created_at, :edited, :cost)`,
+      (id, chat_id, role, content, pending, error, created_at, edited, cost, reasoning, reasoning_details)
+     VALUES (:id, :chat_id, :role, :content, :pending, :error, :created_at, :edited, :cost, :reasoning, :reasoning_details)`,
   );
 
   const tx = () => {
@@ -192,6 +210,10 @@ export function saveChat(chat: StoredChat) {
         created_at: msg.createdAt ?? Date.now(),
         edited: msg.edited ? 1 : 0,
         cost: msg.cost ?? null,
+        reasoning: msg.reasoning ?? null,
+        reasoning_details: msg.reasoningDetails
+          ? JSON.stringify(msg.reasoningDetails)
+          : null,
       });
     }
   };

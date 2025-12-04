@@ -1,4 +1,4 @@
-import type { ChatMap, ChatMessage } from "@/app/page";
+import type { ChatMap, ChatMessage, ContentPart } from "@/types/chat";
 
 export function exportChatAsJSON(
   chatId: string,
@@ -11,6 +11,8 @@ export function exportChatAsJSON(
       index,
       role: msg.role,
       content: msg.content,
+      reasoning: msg.reasoning,
+      reasoningDetails: msg.reasoningDetails,
       timestamp: new Date(parseInt(chatId, 10) + index * 1000).toISOString(),
     })),
   };
@@ -31,15 +33,18 @@ export function exportChatAsMarkdown(
     markdown += `## ${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)} - ${timestamp}\n\n`;
 
     if (Array.isArray(msg.content)) {
-      msg.content.forEach((part) => {
+      msg.content.forEach((part: ContentPart) => {
         if (part.type === "text") {
-          markdown += `${part.text}\n\n`;
+          markdown += `${part.text || ""}\n\n`;
         } else if (part.type === "image_url") {
           markdown += `![Image](${part.image_url.url})\n\n`;
         }
       });
     } else {
       markdown += `${msg.content}\n\n`;
+    }
+    if (msg.reasoning) {
+      markdown += `**Reasoning**\n\n${msg.reasoning}\n\n`;
     }
 
     markdown += `---\n\n`;
@@ -88,15 +93,19 @@ export function exportAllChats(chats: ChatMap, format: "json" | "markdown") {
   if (format === "json") {
     const exportData = {
       timestamp: new Date().toISOString(),
-      chats: Object.entries(chats).map(([id, messages]) => ({
-        id,
-        date: new Date(parseInt(id, 10)).toISOString(),
-        messages: messages.map((msg, index) => ({
-          index,
-          role: msg.role,
-          content: msg.content,
-        })),
-      })),
+      chats: Object.entries(chats as Record<string, ChatMessage[]>).map(
+        ([id, messages]) => ({
+          id,
+          date: new Date(parseInt(id, 10)).toISOString(),
+          messages: (messages as ChatMessage[]).map((msg, index) => ({
+            index,
+            role: msg.role,
+            content: msg.content,
+            reasoning: msg.reasoning,
+            reasoningDetails: msg.reasoningDetails,
+          })),
+        }),
+      ),
     };
 
     const content = JSON.stringify(exportData, null, 2);
@@ -104,12 +113,14 @@ export function exportAllChats(chats: ChatMap, format: "json" | "markdown") {
   } else if (format === "markdown") {
     let markdown = `# All Chats Export - ${new Date().toLocaleDateString()}\n\n`;
 
-    Object.entries(chats).forEach(([chatId, messages]) => {
-      const chatDate = new Date(parseInt(chatId, 10)).toLocaleDateString();
-      markdown += `# Chat from ${chatDate}\n\n`;
-      markdown += exportChatAsMarkdown(chatId, messages);
-      markdown += `\n\n---\n\n`;
-    });
+    Object.entries(chats as Record<string, ChatMessage[]>).forEach(
+      ([chatId, messages]) => {
+        const chatDate = new Date(parseInt(chatId, 10)).toLocaleDateString();
+        markdown += `# Chat from ${chatDate}\n\n`;
+        markdown += exportChatAsMarkdown(chatId, messages as ChatMessage[]);
+        markdown += `\n\n---\n\n`;
+      },
+    );
 
     downloadFile(markdown, `${filename}.md`, "text/markdown");
   }

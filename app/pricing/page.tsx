@@ -17,6 +17,10 @@ function formatDate(ts: number | undefined) {
 export default function PricingPage() {
   const summary = summarizeCosts();
   const costs = listRecentCosts(200);
+  const imageCosts = costs.filter(
+    (row) => (row.metadata as any)?.type === "image",
+  );
+  const imageTotal = imageCosts.reduce((sum, row) => sum + (row.cost || 0), 0);
 
   return (
     <div className="pricing-page">
@@ -25,12 +29,13 @@ export default function PricingPage() {
           <p className="eyebrow">Usage &amp; spend</p>
           <h1>Pricing dashboard</h1>
           <p className="subhead">
-            Live totals from local SQLite log (captured after each OpenRouter / NanoGPT call).
+            Live totals from local SQLite log (captured after each OpenRouter /
+            NanoGPT call).
           </p>
         </div>
         <div className="pricing-actions">
-          <a className="chip" href="/">
-            Back to chat
+          <a className="chip ghost" href="/">
+            ← Back to chat
           </a>
         </div>
       </header>
@@ -40,6 +45,13 @@ export default function PricingPage() {
           <div className="label">Total cost</div>
           <div className="value large">{formatCurrency(summary.totalCost)}</div>
           <div className="hint">Currency: {summary.currency}</div>
+        </div>
+        <div className="pricing-card">
+          <div className="label">Image generation</div>
+          <div className="value">{formatCurrency(imageTotal)}</div>
+          <div className="hint">
+            {imageCosts.length} request{imageCosts.length === 1 ? "" : "s"}
+          </div>
         </div>
         {Object.entries(summary.providerTotals).map(([provider, data]) => (
           <div className="pricing-card" key={provider}>
@@ -53,9 +65,7 @@ export default function PricingPage() {
       <section className="pricing-panel">
         <div className="panel-header">
           <h2>Top models</h2>
-          <span className="hint">
-            Sorted by spend (up to 10 models)
-          </span>
+          <span className="hint">Sorted by spend (up to 10 models)</span>
         </div>
         <div className="chip-row">
           {summary.topModels.length ? (
@@ -76,34 +86,47 @@ export default function PricingPage() {
       <section className="pricing-panel">
         <div className="panel-header">
           <h2>Recent calls</h2>
-          <span className="hint">
-            Showing latest {costs.length} records
-          </span>
+          <span className="hint">Showing latest {costs.length} records</span>
         </div>
-        <div className="pricing-table" role="table">
-          <div className="pricing-row head" role="row">
-            <div>Time</div>
-            <div>Provider</div>
-            <div>Model</div>
-            <div>Prompt</div>
-            <div>Completion</div>
-            <div>Cost</div>
-          </div>
-          {costs.length ? (
-            costs.map((row) => (
-              <div className="pricing-row" role="row" key={row.id || `${row.provider}-${row.createdAt}`}>
-                <div>{formatDate(row.createdAt)}</div>
-                <div className="mono">{row.provider}</div>
-                <div className="mono">{row.model}</div>
-                <div>{row.promptTokens ?? 0}</div>
-                <div>{row.completionTokens ?? 0}</div>
-                <div className="mono">{formatCurrency(row.cost)}</div>
-              </div>
-            ))
-          ) : (
-            <div className="pricing-empty">No cost data yet.</div>
-          )}
-        </div>
+        <table className="pricing-table">
+          <thead>
+            <tr className="pricing-row head">
+              <th scope="col">Time</th>
+              <th scope="col">Provider</th>
+              <th scope="col">Type</th>
+              <th scope="col">Model</th>
+              <th scope="col">Prompt</th>
+              <th scope="col">Completion</th>
+              <th scope="col">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {costs.length ? (
+              costs.map((row) => (
+                <tr
+                  className="pricing-row"
+                  key={row.id || `${row.provider}-${row.createdAt}`}
+                >
+                  <td>{formatDate(row.createdAt)}</td>
+                  <td className="mono">{row.provider}</td>
+                  <td className="mono">
+                    {(row.metadata as any)?.type === "image" ? "image" : "chat"}
+                  </td>
+                  <td className="mono">{row.model}</td>
+                  <td>{row.promptTokens ?? 0}</td>
+                  <td>{row.completionTokens ?? 0}</td>
+                  <td className="mono">{formatCurrency(row.cost)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="pricing-empty" colSpan={7}>
+                  No cost data yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </section>
     </div>
   );

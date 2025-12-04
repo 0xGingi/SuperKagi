@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { env, resolveProvider } from "@/lib/env";
 import { getMcpTools } from "@/lib/mcp";
+import { getNanoApiBase } from "@/lib/nanogpt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       if (!resp.ok) result.provider.error = await resp.text();
     } else if (resolvedProvider === "nanogpt") {
       if (!apiKey) throw new Error("Missing NanoGPT API key");
-      const base = env.nanogptBaseUrl.replace(/\/$/, "");
+      const base = getNanoApiBase(env.nanogptBaseUrl);
       const resp = await fetch(`${base}/models`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { getNanoApiBase } from "@/lib/nanogpt";
+import { recordGenericCost } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,13 +29,8 @@ type NanoGPTImageResponse = {
   remainingBalance?: number;
 };
 
-function buildGenerateImageUrl() {
-  const base = (env.nanogptBaseUrl || "https://nano-gpt.com/v1").replace(
-    /\/+$/,
-    "",
-  );
-  return `${base}/images/generations`;
-}
+const buildGenerateImageUrl = () =>
+  `${getNanoApiBase(env.nanogptBaseUrl)}/images/generations`;
 
 export async function POST(request: Request) {
   let body: ImageGenRequest;
@@ -151,6 +148,20 @@ export async function POST(request: Request) {
       "remaining balance:",
       data.remainingBalance,
     );
+
+    if (typeof data.cost === "number") {
+      try {
+        recordGenericCost({
+          provider: "nanogpt",
+          model,
+          cost: data.cost,
+          currency: "USD",
+          metadata: { type: "image" },
+        });
+      } catch (err) {
+        console.warn("[ImageGen] failed to record cost", err);
+      }
+    }
 
     return NextResponse.json({
       images,

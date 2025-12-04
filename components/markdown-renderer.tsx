@@ -90,7 +90,7 @@ export function MarkdownRenderer({
 
       <style jsx>{`
         .markdown-content {
-          line-height: 1.6;
+          line-height: 1.5;
         }
         
         .markdown-content h1,
@@ -105,15 +105,15 @@ export function MarkdownRenderer({
         }
         
         .markdown-content h1 {
-          font-size: 1.5rem;
+          font-size: 1.25rem;
         }
         
         .markdown-content h2 {
-          font-size: 1.3rem;
+          font-size: 1.15rem;
         }
         
         .markdown-content h3 {
-          font-size: 1.2rem;
+          font-size: 1.1rem;
         }
         
         .markdown-content p {
@@ -170,7 +170,7 @@ export function MarkdownRenderer({
           background: transparent;
           padding: 0;
           border-radius: 0;
-          font-size: 0.875rem;
+          font-size: 13px;
         }
         
         .markdown-content code:not(pre code) {

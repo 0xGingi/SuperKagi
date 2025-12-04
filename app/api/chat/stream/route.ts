@@ -12,7 +12,22 @@ export async function POST(request: Request) {
       const send = (obj: any) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
-      streamChat(body, (text) => send({ content: text }))
+      // Keep-alive pings to prevent client-side stall watchdogs from aborting
+      send({ meta: { status: "started" } });
+      const keepAlive = setInterval(() => {
+        try {
+          send({ meta: { ping: Date.now() } });
+        } catch {
+          // Ignore enqueue errors if stream already closed
+        }
+      }, 10000);
+
+      streamChat(body, (chunk) => {
+        if (chunk?.content) send({ content: chunk.content });
+        if (chunk?.reasoning) send({ reasoning: chunk.reasoning });
+        if (chunk?.reasoning_details)
+          send({ reasoning_details: chunk.reasoning_details });
+      })
         .then((meta) => {
           if (
             meta &&
@@ -26,7 +41,8 @@ export async function POST(request: Request) {
         .catch((error) => {
           send({ error: (error as Error).message });
           controller.close();
-        });
+        })
+        .finally(() => clearInterval(keepAlive));
     },
   });
 

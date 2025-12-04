@@ -1,93 +1,29 @@
 "use client";
 
-import clsx from "clsx";
-import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-
+import type { Attachment } from "@/components/attachment-list";
+import { ChatComposer } from "@/components/chat-composer";
+import { ChatHero } from "@/components/chat-hero";
+import { ChatSidebar } from "@/components/chat-sidebar";
+import { ChatThread } from "@/components/chat-thread";
+import { SettingsModal } from "@/components/settings-modal";
 import { exportChat } from "@/lib/export";
 import {
   type CustomShortcuts,
-  formatShortcutDisplay,
-  isShortcutValid,
   loadCustomShortcuts,
-  parseKeyboardEvent,
   SHORTCUT_CONFIGS,
-  saveCustomShortcuts,
   useKeyboardShortcuts,
 } from "@/lib/keyboard-shortcuts";
 import { useTheme } from "@/lib/theme";
-
-const MarkdownRenderer = dynamic(
-  () =>
-    import("@/components/markdown-renderer").then(
-      (mod) => mod.MarkdownRenderer,
-    ),
-  {
-    ssr: false,
-    loading: () => <div className="markdown-loading">Rendering…</div>,
-  },
-);
-
-export type Provider = "local" | "openrouter" | "nanogpt";
-
-export type ContentPart =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
-
-export type ChatMessage = {
-  role: "user" | "assistant" | "tool";
-  content: string | ContentPart[];
-  id?: string;
-  pending?: boolean;
-  error?: string;
-  createdAt?: number;
-  edited?: boolean;
-  tool_call_id?: string;
-  cost?: number;
-};
-
-export type ChatMap = Record<string, ChatMessage[]>;
-
-type ModelOption = {
-  id: string;
-  label: string;
-  pricing?: string;
-  pricePrompt?: number;
-  priceCompletion?: number;
-  priceUnit?: string;
-  priceCurrency?: string;
-};
-
-export type UiConfig = {
-  provider: Provider;
-  model: string;
-  models: { local: string; openrouter: string; nanogpt: string };
-  imageModel: string;
-  imageSize: string;
-  imageSteps: number;
-  imageGuidanceScale: number;
-  imageSeed?: number;
-  apiKeyOpenrouter?: string;
-  apiKeyNanogpt?: string;
-  apiKey?: string;
-  localUrl: string;
-  systemPrompt: string;
-  deepSearch: boolean;
-  userSet?: {
-    provider?: boolean;
-    models?: { local?: boolean; openrouter?: boolean; nanogpt?: boolean };
-    imageModel?: boolean;
-    imageSize?: boolean;
-    imageSteps?: boolean;
-    imageGuidanceScale?: boolean;
-    imageSeed?: boolean;
-    localUrl?: boolean;
-    systemPrompt?: boolean;
-    deepSearch?: boolean;
-    apiKey?: boolean;
-  };
-};
+import type {
+  ChatMap,
+  ChatMessage,
+  ContentPart,
+  ImageModelOption,
+  ModelOption,
+  Provider,
+  UiConfig,
+} from "@/types/chat";
 
 const defaultModels = {
   local: "llama3",
@@ -95,66 +31,6 @@ const defaultModels = {
   nanogpt: "moonshotai/kimi-k2-thinking",
 };
 const defaultImageModel = "chroma";
-
-const nanoImageModels = [
-  {
-    id: "chroma",
-    name: "Chroma",
-    pricing: "$0.009/img",
-    resolutions: [
-      "1024x1024",
-      "512x512",
-      "768x1024",
-      "576x1024",
-      "1024x768",
-      "1024x576",
-    ],
-  },
-  {
-    id: "hidream",
-    name: "Hidream",
-    pricing: "$0.014/img",
-    resolutions: [
-      "1024x1024",
-      "768x1360",
-      "1360x768",
-      "880x1168",
-      "1168x880",
-      "1248x832",
-      "832x1248",
-    ],
-  },
-  {
-    id: "artiwaifu-diffusion",
-    name: "Juggernaut XL",
-    pricing: "$0.003-$0.006/img",
-    resolutions: [
-      "1024x1024",
-      "1920x1088",
-      "1088x1920",
-      "768x1024",
-      "1024x768",
-      "1408x1024",
-      "1024x1408",
-      "512x512",
-      "2048x2048",
-    ],
-  },
-  {
-    id: "qwen-image",
-    name: "Qwen Image",
-    pricing: "$0.009/img",
-    resolutions: [
-      "auto",
-      "1024x1024",
-      "512x512",
-      "768x1024",
-      "576x1024",
-      "1024x768",
-      "1024x576",
-    ],
-  },
-];
 
 const fallbackDefaults = {
   provider: "local" as Provider,
@@ -168,6 +44,20 @@ const fallbackDefaults = {
   systemPrompt: "",
   deepSearch: false,
 };
+const defaultImageResolutions = [
+  "256x256",
+  "512x512",
+  "768x1024",
+  "576x1024",
+  "1024x768",
+  "1024x576",
+  "1024x1024",
+  "1920x1088",
+  "1088x1920",
+  "1408x1024",
+  "1024x1408",
+  "2048x2048",
+];
 const deepSearchPrompt =
   "\nUse web search/browsing MCP tools to gather and verify up-to-date information. Prefer calling tools to fetch pages; summarize with concise bullet points and include source names.";
 
@@ -205,9 +95,15 @@ function createMessageId() {
   return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function messageText(content: ChatMessage["content"]): string {
+function messageText(
+  msg: Pick<ChatMessage, "content" | "reasoning">,
+  options?: { includeReasoning?: boolean },
+): string {
+  const includeReasoning = options?.includeReasoning ?? true;
+  const content = msg.content;
+  let base = "";
   if (Array.isArray(content)) {
-    return content
+    base = content
       .map((part) => {
         if (part.type === "text") return part.text;
         if (part.type === "image_url") return `[Image] ${part.image_url.url}`;
@@ -215,8 +111,14 @@ function messageText(content: ChatMessage["content"]): string {
       })
       .filter(Boolean)
       .join("\n");
+  } else {
+    base = content || "";
   }
-  return content || "";
+  if (includeReasoning && msg.reasoning) {
+    const reason = msg.reasoning.trim();
+    if (reason) base = base ? `${base}\n\n[Reasoning]\n${reason}` : reason;
+  }
+  return base;
 }
 
 type StoredChat = {
@@ -320,7 +222,7 @@ export default function Page() {
   const [config, setConfig] = useState<UiConfig>(initialConfig);
   const [chats, setChats] = useState<ChatMap>({});
   const [currentChatId, setCurrentChatId] = useState<string>("");
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showConfig, setShowConfig] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -337,20 +239,30 @@ export default function Page() {
   const [nanoModels, setNanoModels] = useState<ModelOption[]>([]);
   const [nanoModelQuery, setNanoModelQuery] = useState("");
   const [nanoModelsStatus, setNanoModelsStatus] = useState("");
-  const [nanoModelScope, setNanoModelScope] = useState<
-    "subscription" | "paid"
-  >("subscription");
+  const [nanoModelScope, setNanoModelScope] = useState<"subscription" | "paid">(
+    "subscription",
+  );
   const [nanoModelsLoading, setNanoModelsLoading] = useState(false);
   const [nanoModelsFetchedAt, setNanoModelsFetchedAt] = useState<number | null>(
     null,
   );
-  const [openrouterModels, setOpenrouterModels] = useState<
-    ModelOption[]
-  >([]);
+  const [openrouterModels, setOpenrouterModels] = useState<ModelOption[]>([]);
   const [openrouterModelQuery, setOpenrouterModelQuery] = useState("");
   const [openrouterModelsStatus, setOpenrouterModelsStatus] = useState("");
   const [openrouterModelsLoading, setOpenrouterModelsLoading] = useState(false);
   const [openrouterModelsFetchedAt, setOpenrouterModelsFetchedAt] = useState<
+    number | null
+  >(null);
+  const [nanoImageModels, setNanoImageModels] = useState<ImageModelOption[]>(
+    [],
+  );
+  const [nanoImageModelQuery, setNanoImageModelQuery] = useState("");
+  const [nanoImageModelsStatus, setNanoImageModelsStatus] = useState("");
+  const [nanoImageModelScope, setNanoImageModelScope] = useState<
+    "subscription" | "paid"
+  >("subscription");
+  const [nanoImageModelsLoading, setNanoImageModelsLoading] = useState(false);
+  const [nanoImageModelsFetchedAt, setNanoImageModelsFetchedAt] = useState<
     number | null
   >(null);
   const [hydrated, setHydrated] = useState(false);
@@ -369,6 +281,7 @@ export default function Page() {
   const [messageSearch, setMessageSearch] = useState("");
   const [persistLoaded, setPersistLoaded] = useState(false);
   const [providerError, setProviderError] = useState<string | null>(null);
+  const [showReasoning, setShowReasoning] = useState(true);
   const swRegisteredRef = useRef(false);
 
   const heroInputRef = useRef<HTMLInputElement>(null);
@@ -393,6 +306,13 @@ export default function Page() {
         setConfig((prev) => mergeEnvDefaults(prev, prev, data));
       })
       .catch(() => undefined);
+
+    try {
+      const storedReasoningPref = localStorage.getItem("showReasoning");
+      if (storedReasoningPref != null) {
+        setShowReasoning(storedReasoningPref !== "false");
+      }
+    } catch {}
 
     setHydrated(true);
   }, []);
@@ -452,6 +372,13 @@ export default function Page() {
       setPersistLoaded(true);
     })();
   }, [hydrated, serverDefaults]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem("showReasoning", String(showReasoning));
+    } catch {}
+  }, [hydrated, showReasoning]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -551,7 +478,8 @@ export default function Page() {
       const files = Array.from(e.dataTransfer.files || []);
       if (!files.length) return;
       const added = await Promise.all(files.map(readAttachment));
-      setAttachments((prev) => [...prev, ...(added.filter(Boolean) as any[])]);
+      const nextAttachments = added.filter((a): a is Attachment => Boolean(a));
+      setAttachments((prev) => [...prev, ...nextAttachments]);
     };
 
     const onPaste = async (e: ClipboardEvent) => {
@@ -562,10 +490,10 @@ export default function Page() {
       if (files.length) {
         e.preventDefault();
         const added = await Promise.all(files.map(readAttachment));
-        setAttachments((prev) => [
-          ...prev,
-          ...(added.filter(Boolean) as any[]),
-        ]);
+        const nextAttachments = added.filter((a): a is Attachment =>
+          Boolean(a),
+        );
+        setAttachments((prev) => [...prev, ...nextAttachments]);
         return;
       }
 
@@ -628,6 +556,13 @@ export default function Page() {
           : "Load subscription-only models using your NanoGPT API key.",
       );
     }
+    if (config.provider === "nanogpt" && !nanoImageModelsStatus) {
+      setNanoImageModelsStatus(
+        nanoImageModelScope === "paid"
+          ? "Load paid NanoGPT image models using your NanoGPT API key."
+          : "Load subscription image models using your NanoGPT API key.",
+      );
+    }
     if (config.provider === "openrouter" && !openrouterModelsStatus) {
       setOpenrouterModelsStatus(
         "Load available models using your OpenRouter API key.",
@@ -637,6 +572,8 @@ export default function Page() {
     config.provider,
     nanoModelsStatus,
     nanoModelScope,
+    nanoImageModelsStatus,
+    nanoImageModelScope,
     openrouterModelsStatus,
   ]);
 
@@ -650,6 +587,17 @@ export default function Page() {
         : "Load subscription-only models using your NanoGPT API key.",
     );
   }, [nanoModelScope, config.provider]);
+
+  useEffect(() => {
+    if (config.provider !== "nanogpt") return;
+    setNanoImageModels([]);
+    setNanoImageModelQuery("");
+    setNanoImageModelsStatus(
+      nanoImageModelScope === "paid"
+        ? "Load paid NanoGPT image models using your NanoGPT API key."
+        : "Load subscription image models using your NanoGPT API key.",
+    );
+  }, [nanoImageModelScope, config.provider]);
 
   // Load custom shortcuts
   useEffect(() => {
@@ -672,6 +620,22 @@ export default function Page() {
       );
     }
   }, [hydrated, nanoModelScope]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const cached = safeParseLocal<{
+      models: ImageModelOption[];
+      fetchedAt: number;
+      scope: "subscription" | "paid";
+    }>(`nanoImageModelsCache-${nanoImageModelScope}`);
+    if (cached?.models?.length) {
+      setNanoImageModels(cached.models);
+      setNanoImageModelsFetchedAt(cached.fetchedAt || null);
+      setNanoImageModelsStatus(
+        `Loaded ${cached.models.length} image models from cache (${new Date(cached.fetchedAt).toLocaleTimeString()}).`,
+      );
+    }
+  }, [hydrated, nanoImageModelScope]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -783,9 +747,11 @@ export default function Page() {
     const q = messageSearch.trim().toLowerCase();
     if (!q) return thread;
     return thread.filter((m) =>
-      messageText(m.content).toLowerCase().includes(q),
+      messageText(m, { includeReasoning: showReasoning })
+        .toLowerCase()
+        .includes(q),
     );
-  }, [thread, messageSearch]);
+  }, [thread, messageSearch, showReasoning]);
 
   const searchActive = !!messageSearch.trim();
 
@@ -805,8 +771,30 @@ export default function Page() {
     return `$${cost.toFixed(4)}`;
   }
 
+  function estimateImageCost(modelId?: string, size?: string) {
+    if (!modelId) return undefined;
+    const match = nanoImageModels.find((m) => m.id === modelId);
+    if (!match) return undefined;
+    const key = (size || "").toLowerCase();
+    const map = match.pricePerResolution;
+    if (map) {
+      const direct = key ? map[key] : undefined;
+      if (typeof direct === "number") return direct;
+      const compactKey = key.replace(/\s+/g, "");
+      const compactVal =
+        compactKey && compactKey !== key ? map[compactKey] : undefined;
+      if (typeof compactVal === "number") return compactVal;
+      if (typeof map.auto === "number") return map.auto;
+      const values = Object.values(map).filter(
+        (v): v is number => typeof v === "number",
+      );
+      if (values.length) return Math.min(...values);
+    }
+    if (typeof match.baseCost === "number") return match.baseCost;
+    return undefined;
+  }
+
   const totalCount = thread.length;
-  const visibleCount = visibleThread.length;
 
   function _focusActiveInput() {
     const useComposer = !isEmpty;
@@ -860,13 +848,18 @@ export default function Page() {
     const provider = config.provider;
     for (const a of attachments) {
       if (a.kind === "image") {
-        if (provider === "openrouter" || provider === "nanogpt")
-          parts.push({ type: "image_url", image_url: { url: a.url } });
-        else parts.push({ type: "text", text: `[Image attached: ${a.name}]` });
+        if ((provider === "openrouter" || provider === "nanogpt") && a.url) {
+          const url: string = a.url;
+          parts.push({ type: "image_url", image_url: { url } });
+        } else {
+          parts.push({ type: "text", text: `[Image attached: ${a.name}]` });
+        }
       } else if (a.kind === "text") {
-        parts.push({ type: "text", text: `File ${a.name}:\n${a.text}` });
+        const text = a.text ?? "";
+        parts.push({ type: "text", text: `File ${a.name}:\n${text}` });
       } else if (a.kind === "note") {
-        parts.push({ type: "text", text: a.text });
+        const text = a.text ?? "";
+        parts.push({ type: "text", text });
       }
     }
     if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
@@ -912,6 +905,8 @@ export default function Page() {
       pending: true,
       id: assistantId,
       createdAt: Date.now(),
+      reasoning: "",
+      reasoningDetails: undefined,
     };
 
     const nextThread = (chats[chatId] ? [...chats[chatId]] : []).concat(
@@ -946,8 +941,10 @@ export default function Page() {
     const stallAbortMs = config.deepSearch ? 120000 : 45000;
     let lastChunkAt = Date.now();
     let assembled = "";
+    let assembledReasoning = "";
     let hasContent = false;
     let latestCost: number | undefined;
+    let latestReasoningDetails: unknown;
 
     const update = (finalize = false, errorText?: string) => {
       setChats((prev) => {
@@ -961,6 +958,11 @@ export default function Page() {
             ...thread[idx],
             role: "assistant",
             content: assembled,
+            reasoning: assembledReasoning || undefined,
+            reasoningDetails:
+              latestReasoningDetails !== undefined
+                ? latestReasoningDetails
+                : thread[idx].reasoningDetails,
             pending: !finalize,
             error: errorText,
             cost: latestCost ?? thread[idx].cost,
@@ -970,12 +972,15 @@ export default function Page() {
       });
     };
 
-    const watchdog = setInterval(() => {
-      const elapsed = Date.now() - lastChunkAt;
-      if (elapsed > stallAbortMs) {
-        controller.abort();
-      }
-    }, Math.max(5000, stallAbortMs / 6));
+    const watchdog = setInterval(
+      () => {
+        const elapsed = Date.now() - lastChunkAt;
+        if (elapsed > stallAbortMs) {
+          controller.abort();
+        }
+      },
+      Math.max(5000, stallAbortMs / 6),
+    );
     try {
       const res = await fetch("/api/chat/stream", {
         method: "POST",
@@ -1027,6 +1032,14 @@ export default function Page() {
               }
               continue;
             }
+            if (typeof data.reasoning === "string") {
+              assembledReasoning += data.reasoning;
+              update(false);
+            }
+            if (data?.reasoning_details !== undefined) {
+              latestReasoningDetails = data.reasoning_details;
+              update(false);
+            }
             if (typeof data.content === "string") {
               assembled += data.content;
               hasContent = hasContent || !!data.content.length;
@@ -1069,7 +1082,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const { content, cost } = await r.json();
+      const { content, cost, reasoning, reasoning_details } = await r.json();
       setChats((prev) => {
         const thread = [...(prev[chatId] || [])];
         const idx =
@@ -1081,6 +1094,12 @@ export default function Page() {
             ...thread[idx],
             role: "assistant",
             content,
+            reasoning:
+              typeof reasoning === "string" ? reasoning : thread[idx].reasoning,
+            reasoningDetails:
+              reasoning_details !== undefined
+                ? reasoning_details
+                : thread[idx].reasoningDetails,
             pending: false,
             error: undefined,
             cost: typeof cost === "number" ? cost : thread[idx].cost,
@@ -1111,7 +1130,7 @@ export default function Page() {
   }
 
   function copyMessage(msg: ChatMessage) {
-    const text = messageText(msg.content);
+    const text = messageText(msg, { includeReasoning: showReasoning });
     if (!text) return;
     const id = msg.id || "copied";
     navigator.clipboard
@@ -1138,7 +1157,7 @@ export default function Page() {
       });
     }
     setEditingMessageId(id);
-    setEditDraft(messageText(msg.content));
+    setEditDraft(messageText(msg, { includeReasoning: false }));
   }
 
   function cancelEditMessage() {
@@ -1176,6 +1195,8 @@ export default function Page() {
       pending: true,
       id: pendingId,
       createdAt: Date.now(),
+      reasoning: "",
+      reasoningDetails: undefined,
     });
 
     setChats((prev) => ({ ...prev, [currentChatId]: nextThread }));
@@ -1187,17 +1208,205 @@ export default function Page() {
     await streamAssistantResponse(currentChatId, payload, pendingId);
   }
 
+  function messageHasImageContent(msg: ChatMessage) {
+    return Array.isArray(msg.content)
+      ? msg.content.some((part) => part.type === "image_url")
+      : false;
+  }
+
+  function extractImagePromptFromUserMessage(msg?: ChatMessage | null) {
+    if (!msg) return null;
+    const text =
+      typeof msg.content === "string"
+        ? msg.content
+        : Array.isArray(msg.content)
+          ? msg.content
+              .filter((part) => part.type === "text")
+              .map((part) => part.text || "")
+              .join("\n")
+          : "";
+    if (!text) return null;
+    const match = text.match(/\[image\]\s*generate:\s*(.+)/i);
+    if (match && match[1]) return match[1].trim();
+    return null;
+  }
+
+  function findPreviousUserMessage(
+    thread: ChatMessage[],
+    beforeIdx: number,
+  ): ChatMessage | null {
+    for (let i = beforeIdx - 1; i >= 0; i -= 1) {
+      if (thread[i]?.role === "user") return thread[i];
+    }
+    return null;
+  }
+
+  async function regenerateImageMessage(
+    chatId: string,
+    targetIdx: number,
+    targetMsg: ChatMessage,
+    originalMessageId: string,
+    threadSnapshot: ChatMessage[],
+    prompt: string | null,
+  ) {
+    const pendingId = createMessageId();
+    const nextThread = threadSnapshot.slice(0, targetIdx).concat({
+      ...targetMsg,
+      id: pendingId,
+      content: "",
+      reasoning: "",
+      reasoningDetails: undefined,
+      pending: true,
+      error: undefined,
+    });
+
+    setChats((prev) => ({ ...prev, [chatId]: nextThread }));
+    setRegeneratingId(originalMessageId);
+    setIsGeneratingImage(true);
+    setProviderError(null);
+
+    const normalizedPrompt = prompt?.trim();
+    if (!normalizedPrompt) {
+      const errorMsg =
+        "Unable to regenerate image: original prompt not found.";
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        const idx = thread.findIndex((m) => m.id === pendingId);
+        if (idx >= 0) {
+          thread[idx] = {
+            ...thread[idx],
+            content: `Error: ${errorMsg}`,
+            pending: false,
+            error: errorMsg,
+          };
+        }
+        return { ...prev, [chatId]: thread };
+      });
+      setIsGeneratingImage(false);
+      setRegeneratingId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/images/generations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: normalizedPrompt,
+          model: config.imageModel || defaultImageModel,
+          size: config.imageSize,
+          num_inference_steps: config.imageSteps,
+          guidance_scale: config.imageGuidanceScale,
+          seed: config.imageSeed,
+          apiKey: getProviderApiKey("nanogpt"),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.images?.[0]?.url) {
+        const errorMsg =
+          data.error || data.details || "Image generation failed";
+        setChats((prev) => {
+          const thread = [...(prev[chatId] || [])];
+          const idx = thread.findIndex((m) => m.id === pendingId);
+          if (idx >= 0 && thread[idx]?.role === "assistant") {
+            thread[idx] = {
+              ...thread[idx],
+              role: "assistant",
+              content: `Error: ${errorMsg}`,
+              pending: false,
+              error: errorMsg,
+            };
+          }
+          return { ...prev, [chatId]: thread };
+        });
+        setProviderError(errorMsg);
+        return;
+      }
+
+      const imageUrl = data.images[0].url;
+      const imageContent: ContentPart[] = [
+        { type: "image_url", image_url: { url: imageUrl } },
+      ];
+      const cost =
+        typeof data.cost === "number"
+          ? data.cost
+          : estimateImageCost(config.imageModel, config.imageSize);
+      if (typeof cost === "number") {
+        imageContent.push({
+          type: "text",
+          text: `Cost: ${formatCost(cost)}`,
+        });
+      }
+
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        const idx = thread.findIndex((m) => m.id === pendingId);
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: imageContent,
+            pending: false,
+            error: undefined,
+            cost: cost ?? thread[idx].cost,
+          };
+        }
+        return { ...prev, [chatId]: thread };
+      });
+    } catch (e) {
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        const idx = thread.findIndex((m) => m.id === pendingId);
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: `Error: ${(e as Error).message}`,
+            pending: false,
+            error: (e as Error).message,
+          };
+        }
+        return { ...prev, [chatId]: thread };
+      });
+      setProviderError((e as Error).message || "Image request failed.");
+    } finally {
+      setIsGeneratingImage(false);
+      setRegeneratingId(null);
+    }
+  }
+
   async function regenerateAssistant(messageId: string) {
     if (!messageId || !currentChatId) return;
     const thread = chats[currentChatId] || [];
     const targetIdx = thread.findIndex((m) => m.id === messageId);
     if (targetIdx === -1) return;
 
+    const targetMsg = thread[targetIdx];
+    const previousUserMsg = findPreviousUserMessage(thread, targetIdx);
+    const imagePrompt = extractImagePromptFromUserMessage(previousUserMsg);
+    const isImageResponse =
+      messageHasImageContent(targetMsg) || Boolean(imagePrompt);
+    if (isImageResponse) {
+      await regenerateImageMessage(
+        currentChatId,
+        targetIdx,
+        targetMsg,
+        messageId,
+        thread,
+        imagePrompt,
+      );
+      return;
+    }
+
     const pendingId = createMessageId();
     const nextThread = thread.slice(0, targetIdx).concat({
       ...thread[targetIdx],
       id: pendingId,
       content: "",
+      reasoning: "",
+      reasoningDetails: undefined,
       pending: true,
       error: undefined,
     });
@@ -1241,6 +1450,8 @@ export default function Page() {
       pending: true,
       id: assistantId,
       createdAt: Date.now(),
+      reasoning: "",
+      reasoningDetails: undefined,
     };
 
     const nextThread = (chats[chatId] ? [...chats[chatId]] : []).concat(
@@ -1293,10 +1504,14 @@ export default function Page() {
       const imageContent: ContentPart[] = [
         { type: "image_url", image_url: { url: imageUrl } },
       ];
-      if (data.cost) {
+      const cost =
+        typeof data.cost === "number"
+          ? data.cost
+          : estimateImageCost(config.imageModel, config.imageSize);
+      if (typeof cost === "number") {
         imageContent.push({
           type: "text",
-          text: `Cost: $${data.cost.toFixed(4)}`,
+          text: `Cost: ${formatCost(cost)}`,
         });
       }
 
@@ -1310,6 +1525,7 @@ export default function Page() {
             content: imageContent,
             pending: false,
             error: undefined,
+            cost: cost ?? thread[idx].cost,
           };
         }
         return { ...prev, [chatId]: thread };
@@ -1375,39 +1591,6 @@ export default function Page() {
     setSidebarOpen(false);
   }
 
-  function renderMessageContent(msg: ChatMessage) {
-    if (Array.isArray(msg.content)) {
-      const textParts = msg.content
-        .filter((part) => part.type === "text")
-        .map((part) => part.text || "")
-        .join("\n");
-
-      const imageParts = msg.content.filter(
-        (part) => part.type === "image_url",
-      );
-
-      return (
-        <div>
-          {textParts && <MarkdownRenderer content={textParts} />}
-          {imageParts.map((part) => (
-            <Image
-              key={part.image_url.url}
-              src={part.image_url.url}
-              alt="Generated content"
-              className="markdown-image"
-              unoptimized
-              width={1024}
-              height={1024}
-              style={{ width: "100%", height: "auto" }}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    return <MarkdownRenderer content={msg.content || ""} />;
-  }
-
   function toggleDeepSearch() {
     setConfig((prev) => ({
       ...prev,
@@ -1451,7 +1634,12 @@ export default function Page() {
     const pricing =
       (model && (model.pricing || model.prices || model.price)) || null;
     if (!pricing || typeof pricing !== "object") {
-      return { prompt: undefined, completion: undefined, unit: undefined, currency: undefined };
+      return {
+        prompt: undefined,
+        completion: undefined,
+        unit: undefined,
+        currency: undefined,
+      };
     }
     const prompt =
       pricing.prompt ??
@@ -1488,9 +1676,7 @@ export default function Page() {
     return "";
   }
 
-  function normalizeNanoModels(
-    list: any[],
-  ): ModelOption[] {
+  function normalizeNanoModels(list: any[]): ModelOption[] {
     if (!Array.isArray(list)) {
       if (list && typeof list === "object") {
         if ((list as any).text && typeof (list as any).text === "object") {
@@ -1526,9 +1712,7 @@ export default function Page() {
       .filter(Boolean) as ModelOption[];
   }
 
-  function normalizeOpenrouterModels(
-    list: any[],
-  ): ModelOption[] {
+  function normalizeOpenrouterModels(list: any[]): ModelOption[] {
     if (!Array.isArray(list)) return [];
     return list
       .map((item) => {
@@ -1540,6 +1724,134 @@ export default function Page() {
         return { id: String(id), label, pricing };
       })
       .filter(Boolean) as ModelOption[];
+  }
+
+  function formatNanoImagePricing(model: any) {
+    const pricing =
+      model?.pricing?.per_image || model?.pricing?.image || model?.cost;
+    const currency = model?.pricing?.currency || model?.currency || "USD";
+    if (!pricing) return "";
+    if (typeof pricing === "number") {
+      const symbol = currency === "USD" ? "$" : `${currency} `;
+      return `${symbol}${pricing}/img`;
+    }
+    if (typeof pricing === "string") return pricing;
+    const values = Object.values(pricing || {}).filter(
+      (v) => typeof v === "number",
+    ) as number[];
+    if (!values.length) return "";
+    const min = Math.min(...values);
+    const symbol = currency === "USD" ? "$" : `${currency} `;
+    return `${symbol}${min}/img`;
+  }
+
+  function extractImageResolutions(model: any) {
+    const res: string[] = [];
+    const addVal = (v?: unknown) => {
+      const val =
+        typeof v === "string"
+          ? v
+          : typeof v === "object" && v && "value" in v
+            ? String((v as any).value)
+            : null;
+      if (val && !res.includes(val)) res.push(val);
+    };
+    const supported = model?.supported_parameters?.resolutions;
+    if (Array.isArray(supported)) supported.forEach(addVal);
+    const fromRes = model?.resolutions;
+    if (Array.isArray(fromRes)) fromRes.forEach(addVal);
+    return res;
+  }
+
+  function deriveImageDefaults(model: any) {
+    const resolutions = extractImageResolutions(model);
+    const firstNonAuto = resolutions.find((r: string) => r !== "auto");
+    const defaultSizeRaw =
+      model?.defaultSettings?.resolution ||
+      model?.defaultSettings?.size ||
+      model?.defaultSettings?.resolution_name ||
+      model?.default_size;
+    const defaultSize =
+      typeof defaultSizeRaw === "string"
+        ? defaultSizeRaw
+        : firstNonAuto || resolutions[0];
+    const steps =
+      typeof model?.defaultSettings?.steps === "number"
+        ? model.defaultSettings.steps
+        : typeof model?.defaultSettings?.num_inference_steps === "number"
+          ? model.defaultSettings.num_inference_steps
+          : typeof model?.additionalParams?.steps?.default === "number"
+            ? model.additionalParams.steps.default
+            : undefined;
+    const guidance =
+      typeof model?.defaultSettings?.CFGScale === "number"
+        ? model.defaultSettings.CFGScale
+        : typeof model?.defaultSettings?.guidance_scale === "number"
+          ? model.defaultSettings.guidance_scale
+          : typeof model?.additionalParams?.CFGScale?.default === "number"
+            ? model.additionalParams.CFGScale.default
+            : typeof model?.additionalParams?.guidance_scale?.default ===
+                "number"
+              ? model.additionalParams.guidance_scale.default
+              : undefined;
+    return { size: defaultSize, steps, guidance, resolutions };
+  }
+
+  function extractImagePriceMap(model: any) {
+    const pricing =
+      model?.pricing?.per_image ||
+      model?.pricing?.image ||
+      model?.cost ||
+      model?.prices;
+    if (!pricing || typeof pricing !== "object") return undefined;
+    const map: Record<string, number> = {};
+    Object.entries(pricing).forEach(([key, val]) => {
+      if (typeof val === "number") map[key.toLowerCase()] = val;
+    });
+    return Object.keys(map).length ? map : undefined;
+  }
+
+  function normalizeNanoImageModels(
+    list: any[],
+    scope: "subscription" | "paid",
+  ): ImageModelOption[] {
+    if (!Array.isArray(list)) {
+      if (list && typeof list === "object") {
+        list = Object.values(list);
+      } else {
+        return [];
+      }
+    }
+    return list
+      .map((item) => {
+        if (!item) return null;
+        const id = item.id || item.model || item.name;
+        if (!id) return null;
+        const pricing = formatNanoImagePricing(item);
+        const defaults = deriveImageDefaults(item);
+        const pricePerResolution = extractImagePriceMap(item);
+        const minPrice =
+          pricePerResolution && Object.values(pricePerResolution).length
+            ? Math.min(...Object.values(pricePerResolution))
+            : undefined;
+        const labelBase = item.name || id;
+        const meta = [pricing, defaults.size].filter(Boolean).join(" • ");
+        return {
+          id: String(id),
+          label: meta ? `${labelBase} · ${meta}` : String(labelBase),
+          name: item.name,
+          pricing,
+          scope,
+          resolutions: defaults.resolutions,
+          defaultSize: defaults.size,
+          defaultSteps: defaults.steps,
+          defaultGuidance: defaults.guidance,
+          pricePerResolution,
+          currency: item?.pricing?.currency || item?.currency,
+          baseCost: minPrice,
+        };
+      })
+      .filter(Boolean) as ImageModelOption[];
   }
 
   function applyNanoModel(id: string) {
@@ -1564,6 +1876,36 @@ export default function Page() {
         models: { ...(prev.userSet?.models || {}), openrouter: true },
       },
     }));
+  }
+
+  function applyNanoImageModel(id: string) {
+    const match = nanoImageModels.find((m) => m.id === id);
+    setConfig((prev) => {
+      const next: UiConfig = {
+        ...prev,
+        imageModel: id,
+        userSet: {
+          ...(prev.userSet || { models: {} }),
+          imageModel: true,
+          imageSize:
+            prev.userSet?.imageSize ||
+            (match?.defaultSize ? true : prev.userSet?.imageSize),
+          imageSteps:
+            prev.userSet?.imageSteps ||
+            (match?.defaultSteps ? true : prev.userSet?.imageSteps),
+          imageGuidanceScale:
+            prev.userSet?.imageGuidanceScale ||
+            (match?.defaultGuidance ? true : prev.userSet?.imageGuidanceScale),
+        },
+      };
+      if (match?.defaultSize) next.imageSize = match.defaultSize;
+      if (typeof match?.defaultSteps === "number")
+        next.imageSteps = match.defaultSteps;
+      if (typeof match?.defaultGuidance === "number")
+        next.imageGuidanceScale = match.defaultGuidance;
+      return next;
+    });
+    setImageSettingsExpanded(true);
   }
 
   async function fetchNanoModels() {
@@ -1625,6 +1967,69 @@ export default function Page() {
       setNanoModelsStatus(`Failed: ${(error as Error).message}`);
     } finally {
       setNanoModelsLoading(false);
+    }
+  }
+
+  async function fetchNanoImageModels() {
+    const key = getProviderApiKey("nanogpt");
+    if (!key && nanoImageModelScope === "subscription") {
+      setNanoImageModelsStatus("Add a NanoGPT API key first.");
+      return;
+    }
+    setNanoImageModelsLoading(true);
+    const scope = nanoImageModelScope;
+    setNanoImageModelsStatus(
+      scope === "paid"
+        ? "Fetching paid NanoGPT image models…"
+        : "Fetching NanoGPT subscription image models…",
+    );
+    try {
+      const payload: Record<string, any> = {
+        detailed: true,
+        scope,
+        apiKey: getProviderApiKey("nanogpt"),
+      };
+      const res = await fetch("/api/nanogpt/image-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNanoImageModels([]);
+        setNanoImageModelsStatus(
+          data?.error ? String(data.error) : `Request failed (${res.status})`,
+        );
+        return;
+      }
+      const normalized = normalizeNanoImageModels(
+        data?.models || data?.raw?.data || data?.raw || [],
+        scope,
+      );
+      setNanoImageModels(normalized);
+      setNanoImageModelsFetchedAt(Date.now());
+      try {
+        localStorage.setItem(
+          `nanoImageModelsCache-${scope}`,
+          JSON.stringify({
+            models: normalized,
+            fetchedAt: Date.now(),
+            scope,
+          }),
+        );
+      } catch {}
+      setNanoImageModelsStatus(
+        normalized.length
+          ? `Loaded ${normalized.length} ${scope === "paid" ? "paid" : "subscription"} image models.`
+          : scope === "paid"
+            ? "No image models returned. Check NanoGPT API key."
+            : "No image models returned. Check subscription/API key.",
+      );
+    } catch (error) {
+      setNanoImageModels([]);
+      setNanoImageModelsStatus(`Failed: ${(error as Error).message}`);
+    } finally {
+      setNanoImageModelsLoading(false);
     }
   }
 
@@ -1815,7 +2220,8 @@ export default function Page() {
   async function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     const added = await Promise.all(files.map(readAttachment));
-    setAttachments((prev) => [...prev, ...(added.filter(Boolean) as any[])]);
+    const nextAttachments = added.filter((a): a is Attachment => Boolean(a));
+    setAttachments((prev) => [...prev, ...nextAttachments]);
     e.target.value = "";
   }
 
@@ -1843,139 +2249,92 @@ export default function Page() {
     );
   }, [openrouterModels, openrouterModelQuery]);
 
+  const filteredNanoImageModels = useMemo(() => {
+    const q = nanoImageModelQuery.toLowerCase();
+    if (!q) return nanoImageModels;
+    return nanoImageModels.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.label && m.label.toLowerCase().includes(q)),
+    );
+  }, [nanoImageModels, nanoImageModelQuery]);
+
+  const activeImageModel = useMemo(
+    () => nanoImageModels.find((m) => m.id === (config.imageModel || "")),
+    [nanoImageModels, config.imageModel],
+  );
+
+  useEffect(() => {
+    if (!nanoImageModels.length) return;
+    const match = nanoImageModels.find((m) => m.id === config.imageModel);
+    if (!match) return;
+    setConfig((prev) => {
+      const userSet = prev.userSet || { models: {} };
+      let changed = false;
+      const next: UiConfig = { ...prev };
+      if (!userSet.imageSize && match.defaultSize) {
+        next.imageSize = match.defaultSize;
+        changed = true;
+      }
+      if (!userSet.imageSteps && typeof match.defaultSteps === "number") {
+        next.imageSteps = match.defaultSteps;
+        changed = true;
+      }
+      if (
+        !userSet.imageGuidanceScale &&
+        typeof match.defaultGuidance === "number"
+      ) {
+        next.imageGuidanceScale = match.defaultGuidance;
+        changed = true;
+      }
+      if (!changed) return prev;
+      next.userSet = {
+        ...userSet,
+        imageSize: userSet.imageSize || !!match.defaultSize,
+        imageSteps:
+          userSet.imageSteps || typeof match.defaultSteps === "number",
+        imageGuidanceScale:
+          userSet.imageGuidanceScale ||
+          typeof match.defaultGuidance === "number",
+      };
+      return next;
+    });
+  }, [nanoImageModels, config.imageModel]);
+
+  const imageResolutionOptions = useMemo(() => {
+    const base =
+      activeImageModel?.resolutions && activeImageModel.resolutions.length
+        ? activeImageModel.resolutions
+        : defaultImageResolutions;
+    const unique = new Set<string>();
+    base.forEach((r) => {
+      if (typeof r === "string" && r.trim()) unique.add(r);
+    });
+    if (config.imageSize) unique.add(config.imageSize);
+    return Array.from(unique);
+  }, [activeImageModel?.resolutions, config.imageSize]);
+
   return (
     <>
-      <aside
-        className={clsx("sidebar", { open: sidebarOpen })}
-        aria-label="Sidebar"
-      >
-        <div className="sidebar-header">
-          <button
-            type="button"
-            className="icon-btn"
-            title="Menu"
-            aria-label="Menu"
-            onClick={handleSidebarToggle}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 12h18" />
-              <path d="M3 6h18" />
-              <path d="M3 18h18" />
-            </svg>
-          </button>
-          <div className="brand">SuperKagi</div>
-        </div>
-        <div className="sidebar-search">
-          <div className="search-input">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              id="chat-search"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-        <nav className="sidebar-nav">
-          <button
-            type="button"
-            className="chip w-full"
-            onClick={newChat}
-            title="New Chat"
-            aria-label="New Chat"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-            New Chat
-          </button>
-          <button
-            type="button"
-            className="chip w-full"
-            onClick={() => setShowConfig(true)}
-            title="Settings"
-            aria-label="Settings"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 1v4" />
-              <path d="M12 19v4" />
-              <path d="M4.22 4.22l2.83 2.83" />
-              <path d="M16.95 16.95l2.83 2.83" />
-              <path d="M1 12h4" />
-              <path d="M19 12h4" />
-              <path d="M4.22 19.78l2.83-2.83" />
-              <path d="M16.95 7.05l2.83-2.83" />
-            </svg>
-            Config
-          </button>
-          <button
-            type="button"
-            className="chip w-full"
-            onClick={() => {
-              if (thread.length > 0) {
-                exportChat(currentChatId, thread, "markdown");
-              }
-            }}
-            title="Export current chat"
-            aria-label="Export current chat"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7,10 12,15 17,10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Export
-          </button>
+      <ChatSidebar
+        sidebarOpen={sidebarOpen}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggle={handleSidebarToggle}
+        onCloseOverlay={() => setSidebarOpen(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onNewChat={newChat}
+        onOpenConfig={() => setShowConfig(true)}
+        onExport={() => {
+          if (thread.length > 0) {
+            exportChat(currentChatId, thread, "markdown");
+          }
+        }}
+        chats={filteredChats()}
+        currentChatId={currentChatId}
+        onDeleteChat={deleteChat}
+        onSwitchChat={switchChat}
+        extraNav={
           <a
             className="chip w-full"
             href="/pricing"
@@ -1998,44 +2357,7 @@ export default function Page() {
             </svg>
             Pricing
           </a>
-        </nav>
-        <h3 className="section-title">Chats</h3>
-        <ul className="chat-list" id="chat-list">
-          {filteredChats().map((item) => (
-            <li key={item.id} onClick={() => switchChat(item.id)}>
-              <div
-                className={clsx("chat-item", {
-                  active: item.id === currentChatId,
-                })}
-                title={item.label}
-              >
-                <div>
-                  <span className="chat-title">{item.label}</span>
-                  <span className="chat-meta">
-                    {item.dateText} • {item.timeText}
-                    {item.costText ? ` • ${item.costText}` : ""}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="mini-btn"
-                  title="Delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteChat(item.id);
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-      <div
-        className={clsx("sidebar-overlay", { show: sidebarOpen })}
-        onClick={() => setSidebarOpen(false)}
+        }
       />
 
       <main className="main">
@@ -2065,83 +2387,22 @@ export default function Page() {
         </header>
 
         <section className="chat-wrap">
-          <div className="hero" style={{ display: isEmpty ? "flex" : "none" }}>
-            <h1 className="hero-title">SuperKagi</h1>
-            <div className="hero-input">
-              <div className="pill-input">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Attach"
-                  aria-label="Attach"
-                  onClick={openFilePicker}
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49" />
-                  </svg>
-                </button>
-                <input
-                  className="input"
-                  id="input"
-                  ref={heroInputRef}
-                  placeholder="What do you want to know?"
-                  value={heroValue}
-                  onChange={(e) => setHeroValue(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendMessage("hero")}
-                />
-                <div className="input-actions">
-                  {config.provider === "nanogpt" && (
-                    <button
-                      type="button"
-                      className="chip"
-                      onClick={() => generateImage("hero")}
-                      disabled={isGeneratingImage}
-                      title="Generate Image"
-                    >
-                      {isGeneratingImage ? "…" : "IMG"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="chip primary"
-                    onClick={() => sendMessage("hero")}
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-              <AttachmentList
-                attachments={attachments}
-                removeAttachment={removeAttachment}
-              />
-            </div>
-            <div className="hero-actions">
-              <button
-                type="button"
-                className={clsx("chip", "toggle", { active: deepOn })}
-                onClick={toggleDeepSearch}
-              >
-                DeepSearch
-              </button>
-
-              <button
-                type="button"
-                className="chip"
-                onClick={() => setShowConfig(true)}
-              >
-                Config
-              </button>
-            </div>
-          </div>
+          <ChatHero
+            isEmpty={isEmpty}
+            heroValue={heroValue}
+            onChange={setHeroValue}
+            onSend={() => sendMessage("hero")}
+            openFilePicker={openFilePicker}
+            toggleDeepSearch={toggleDeepSearch}
+            deepOn={deepOn}
+            configProvider={config.provider}
+            isGeneratingImage={isGeneratingImage}
+            onGenerateImage={() => generateImage("hero")}
+            attachments={attachments}
+            removeAttachment={removeAttachment}
+            inputRef={heroInputRef}
+            onOpenConfig={() => setShowConfig(true)}
+          />
 
           <div
             className="chat-area"
@@ -2163,1173 +2424,113 @@ export default function Page() {
               </div>
             ) : null}
             {deepSearchActive ? (
-              <div className="provider-error info" role="status">
+              <output className="provider-error info">
                 <span>DeepSearch is running tools for this message…</span>
                 <span className="badge">MCP</span>
-              </div>
+              </output>
             ) : null}
-            {!isEmpty ? (
-              <div className="thread-toolbar">
-                <div className="thread-search">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="M21 21l-4.3-4.3" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Search in this chat"
-                    value={messageSearch}
-                    onChange={(e) => setMessageSearch(e.target.value)}
-                  />
-                  {messageSearch ? (
-                    <button
-                      type="button"
-                      className="mini-btn ghost"
-                      onClick={() => setMessageSearch("")}
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                </div>
-                <div className="thread-meta">
-                  {searchActive
-                    ? `${visibleCount}/${totalCount} matches`
-                    : `${totalCount} messages`}
-                </div>
-              </div>
-            ) : null}
-            {searchActive && !visibleThread.length ? (
-              <div className="search-empty">
-                No messages match “{messageSearch.trim()}”.
-              </div>
-            ) : null}
-            {visibleThread.map((msg, idx) => {
-              const messageId = msg.id || `${currentChatId}-${idx}`;
-              const canEdit = msg.role === "user" && !msg.pending;
-              const canRegenerate = msg.role === "assistant" && !msg.pending;
-              const isEditingMessage = editingMessageId === messageId;
-              const isRegenerating = regeneratingId === messageId;
-              const isCopying = copiedId === messageId;
-              const errorText =
-                msg.error ||
-                (typeof msg.content === "string" &&
-                msg.content.toLowerCase().startsWith("error:")
-                  ? msg.content
-                  : "");
-
-              return (
-                <div key={messageId} className={clsx("message", msg.role)}>
-                  <div className="message-row">
-                    <div
-                      className={clsx("bubble", msg.role, {
-                        typing: msg.pending,
-                      })}
-                    >
-                      {msg.pending ? (
-                        <output className="typing-dots" aria-live="polite">
-                          <span className="dot" />
-                          <span className="dot" />
-                          <span className="dot" />
-                        </output>
-                      ) : isEditingMessage ? (
-                        <div className="edit-block">
-                          <textarea
-                            className="field field-textarea"
-                            ref={editInputRef}
-                            value={editDraft}
-                            onChange={(e) => setEditDraft(e.target.value)}
-                            rows={Math.max(3, editDraft.split("\n").length)}
-                          />
-                          <div className="edit-actions">
-                            <button
-                              type="button"
-                              className="chip primary"
-                              onClick={saveEditedMessage}
-                            >
-                              Save &amp; resend
-                            </button>
-                            <button
-                              type="button"
-                              className="chip"
-                              onClick={cancelEditMessage}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        renderMessageContent(msg)
-                      )}
-                    </div>
-                    <div className="message-actions">
-                      <button
-                        type="button"
-                        className="mini-btn ghost"
-                        title="Copy message"
-                        onClick={() => copyMessage(msg)}
-                      >
-                        {isCopying ? "Copied" : "Copy"}
-                      </button>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          className="mini-btn ghost"
-                          title="Edit message"
-                          onClick={() => startEditMessage(msg)}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {canRegenerate && (
-                        <button
-                          type="button"
-                          className="mini-btn ghost"
-                          title="Regenerate response"
-                          onClick={() => regenerateAssistant(messageId)}
-                          disabled={isRegenerating}
-                        >
-                          {isRegenerating ? "…" : "Regenerate"}
-                        </button>
-                      )}
-                    </div>
-                    <div className="message-meta">
-                      {formatMessageTime(msg)}
-                      {msg.cost != null && !Number.isNaN(msg.cost)
-                        ? ` • ${formatCost(msg.cost)}`
-                        : ""}
-                      {msg.edited ? " • Edited" : ""}
-                    </div>
-                  </div>
-                  {errorText ? (
-                    <div className="message-error">
-                      <div className="error-text">{errorText}</div>
-                      {canRegenerate ? (
-                        <button
-                          type="button"
-                          className="mini-btn"
-                          onClick={() => regenerateAssistant(messageId)}
-                          disabled={isRegenerating}
-                        >
-                          Retry
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            <ChatThread
+              thread={thread}
+              visibleThread={visibleThread}
+              searchActive={searchActive}
+              totalCount={totalCount}
+              visibleCount={visibleThread.length}
+              editingMessageId={editingMessageId}
+              editDraft={editDraft}
+              editInputRef={editInputRef}
+              regeneratingId={regeneratingId}
+              copiedId={copiedId}
+              messageSearch={messageSearch}
+              setMessageSearch={setMessageSearch}
+              onCopyMessage={copyMessage}
+              onStartEdit={(msg) => startEditMessage(msg)}
+              onCancelEdit={cancelEditMessage}
+              onSaveEdit={saveEditedMessage}
+              onEditDraftChange={setEditDraft}
+              onRegenerate={regenerateAssistant}
+              onRetry={regenerateAssistant}
+              formatMessageTime={formatMessageTime}
+              formatCost={formatCost}
+              showReasoning={showReasoning}
+              onToggleReasoning={() => setShowReasoning((v) => !v)}
+            />
           </div>
         </section>
 
-        <footer
-          className="composer"
-          style={{ display: isEmpty ? "none" : "grid" }}
-        >
-          <div className="composer-inner">
-            <button
-              type="button"
-              className="icon-btn"
-              title="Attach"
-              aria-label="Attach"
-              onClick={openFilePicker}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.2a2 2 0 01-2.83-2.83l8.49-8.49" />
-              </svg>
-            </button>
-            <input
-              className="input"
-              id="composer-input"
-              ref={composerInputRef}
-              placeholder="Type a message…"
-              value={composerValue}
-              onChange={(e) => setComposerValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage("composer")}
-            />
-            <div className="composer-actions">
-              <button
-                type="button"
-                className={clsx("chip", "toggle", { active: deepOn })}
-                onClick={toggleDeepSearch}
-              >
-                DeepSearch
-              </button>
-
-              {config.provider === "nanogpt" && (
-                <button
-                  type="button"
-                  className="chip"
-                  onClick={() => generateImage("composer")}
-                  disabled={isGeneratingImage}
-                  title="Generate Image"
-                >
-                  {isGeneratingImage ? "…" : "IMG"}
-                </button>
-              )}
-              <button
-                type="button"
-                className="chip primary"
-                onClick={() => sendMessage("composer")}
-              >
-                Send
-              </button>
-            </div>
-          </div>
-          <AttachmentList
-            attachments={attachments}
-            removeAttachment={removeAttachment}
-          />
-        </footer>
+        <ChatComposer
+          visible={!isEmpty}
+          composerValue={composerValue}
+          onChange={setComposerValue}
+          onSend={() => sendMessage("composer")}
+          openFilePicker={openFilePicker}
+          toggleDeepSearch={toggleDeepSearch}
+          deepOn={deepOn}
+          configProvider={config.provider}
+          isGeneratingImage={isGeneratingImage}
+          onGenerateImage={() => generateImage("composer")}
+          attachments={attachments}
+          removeAttachment={removeAttachment}
+          inputRef={composerInputRef}
+        />
       </main>
 
-      {showConfig && (
-        <div
-          className="modal show"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="settings-title"
-          onClick={() => setShowConfig(false)}
-        >
-          <div
-            className="settings-card"
-            role="document"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="settings-header">
-              <h2 id="settings-title">Settings</h2>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Close"
-                onClick={() => setShowConfig(false)}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M18 6L6 18" />
-                  <path d="M6 6l12 12" />
-                </svg>
-              </button>
-            </header>
-            <div className="settings-body">
-              <aside className="settings-nav">
-                <button
-                  type="button"
-                  className={clsx("nav-item", {
-                    active: settingsTab === "settings",
-                  })}
-                  onClick={() => setSettingsTab("settings")}
-                >
-                  <span className="dot" /> Settings
-                </button>
-                <button
-                  type="button"
-                  className={clsx("nav-item", {
-                    active: settingsTab === "shortcuts",
-                  })}
-                  onClick={() => setSettingsTab("shortcuts")}
-                >
-                  <span className="dot" /> Keyboard Shortcuts
-                </button>
-              </aside>
-              <section className="settings-main">
-                {settingsTab === "settings" ? (
-                  <div className="section">
-                    <div className="section-title">Appearance</div>
-                    <div className="settings-row">
-                      <div className="row-label">Theme</div>
-                      <div className="row-content">
-                        <div className="segmented">
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: theme === "system",
-                            })}
-                            onClick={() => setTheme("system")}
-                          >
-                            System
-                          </button>
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: theme === "dark",
-                            })}
-                            onClick={() => setTheme("dark")}
-                          >
-                            Dark
-                          </button>
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: theme === "light",
-                            })}
-                            onClick={() => setTheme("light")}
-                          >
-                            Light
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="section-title">Connections</div>
-
-                    <div className="settings-row">
-                      <div className="row-label">Provider</div>
-                      <div className="row-content">
-                        <div className="segmented" id="provider-seg">
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: config.provider === "local",
-                            })}
-                            onClick={() => setProvider("local")}
-                          >
-                            Local
-                          </button>
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: config.provider === "openrouter",
-                            })}
-                            onClick={() => setProvider("openrouter")}
-                          >
-                            OpenRouter
-                          </button>
-                          <button
-                            type="button"
-                            className={clsx("seg", {
-                              active: config.provider === "nanogpt",
-                            })}
-                            onClick={() => setProvider("nanogpt")}
-                          >
-                            NanoGPT
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <div className="row-label">Model</div>
-                      <div
-                        className="row-content"
-                        style={{
-                          flexDirection: "column",
-                          alignItems: "stretch",
-                          gap: "10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
-                        >
-                          <input
-                            className="field"
-                            id="model"
-                            value={
-                              config.models?.[config.provider] ||
-                              config.model ||
-                              ""
-                            }
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                models: {
-                                  ...prev.models,
-                                  [prev.provider]: e.target.value,
-                                },
-                                model: e.target.value,
-                              }))
-                            }
-                            placeholder="e.g., openrouter/auto"
-                            autoComplete="off"
-                          />
-                          {config.provider === "nanogpt" && (
-                            <button
-                              type="button"
-                              className="mini-btn"
-                              onClick={fetchNanoModels}
-                              disabled={nanoModelsLoading}
-                            >
-                              {nanoModelsLoading ? "Fetching…" : "Load models"}
-                            </button>
-                          )}
-                          {config.provider === "openrouter" && (
-                            <button
-                              type="button"
-                              className="mini-btn"
-                              onClick={fetchOpenrouterModels}
-                              disabled={openrouterModelsLoading}
-                            >
-                              {openrouterModelsLoading
-                                ? "Fetching…"
-                                : "Load models"}
-                            </button>
-                          )}
-                        </div>
-
-                        {config.provider === "nanogpt" && (
-                            <div className="nano-models">
-                            <div className="nano-status">
-                                <div>{nanoModelsStatus ||
-                                  "Uses your NanoGPT API key to load subscription models."}</div>
-                                {nanoModelsFetchedAt ? (
-                                  <div className="nano-meta">
-                                    Last fetched at{" "}
-                                    {new Date(
-                                      nanoModelsFetchedAt,
-                                    ).toLocaleTimeString()}
-                                  </div>
-                                ) : null}
-                              </div>
-                              <div className="nano-model-actions">
-                                <div className="segmented nano-scope-toggle">
-                                  <button
-                                    type="button"
-                                    className={clsx("seg", {
-                                      active: nanoModelScope === "subscription",
-                                    })}
-                                    onClick={() => setNanoModelScope("subscription")}
-                                  >
-                                    Subscription
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={clsx("seg", {
-                                      active: nanoModelScope === "paid",
-                                    })}
-                                    onClick={() => setNanoModelScope("paid")}
-                                  >
-                                    Paid
-                                  </button>
-                                </div>
-                                <input
-                                  className="field"
-                                  id="nanogpt-model-search"
-                                  placeholder="Filter NanoGPT models"
-                                  value={nanoModelQuery}
-                                onChange={(e) =>
-                                  setNanoModelQuery(e.target.value)
-                                }
-                                autoComplete="off"
-                              />
-                              <button
-                                type="button"
-                                className="mini-btn"
-                                onClick={() => setNanoModelQuery("")}
-                                disabled={!nanoModelQuery}
-                              >
-                                Clear
-                              </button>
-                            </div>
-                            <div className="nano-model-list">
-                              {filteredNanoModels.length ? (
-                                filteredNanoModels.map((m) => (
-                                  <button
-                                    type="button"
-                                    key={m.id}
-                                    className={clsx("model-pill", {
-                                      active:
-                                        (config.models?.nanogpt ||
-                                          config.model) === m.id,
-                                    })}
-                                    onClick={() => applyNanoModel(m.id)}
-                                    title={m.label}
-                                  >
-                                    <span className="label">{m.id}</span>
-                                    {m.pricing ? (
-                                      <span className="meta">{m.pricing}</span>
-                                    ) : null}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="nano-status">
-                                  No models loaded yet.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {config.provider === "openrouter" && (
-                          <div className="nano-models">
-                            <div className="nano-status">
-                              <div>{openrouterModelsStatus ||
-                                "Uses your OpenRouter API key to load available models."}</div>
-                              {openrouterModelsFetchedAt ? (
-                                <div className="nano-meta">
-                                  Last fetched at{" "}
-                                  {new Date(
-                                    openrouterModelsFetchedAt,
-                                  ).toLocaleTimeString()}
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="nano-model-actions">
-                              <input
-                                className="field"
-                                id="openrouter-model-search"
-                                placeholder="Filter OpenRouter models"
-                                value={openrouterModelQuery}
-                                onChange={(e) =>
-                                  setOpenrouterModelQuery(e.target.value)
-                                }
-                                autoComplete="off"
-                              />
-                              <button
-                                type="button"
-                                className="mini-btn"
-                                onClick={() => setOpenrouterModelQuery("")}
-                                disabled={!openrouterModelQuery}
-                              >
-                                Clear
-                              </button>
-                            </div>
-                            <div className="nano-model-list">
-                              {filteredOpenrouterModels.length ? (
-                                filteredOpenrouterModels.map((m) => (
-                                  <button
-                                    type="button"
-                                    key={m.id}
-                                    className={clsx("model-pill", {
-                                      active:
-                                        (config.models?.openrouter ||
-                                          config.model) === m.id,
-                                    })}
-                                    onClick={() => applyOpenrouterModel(m.id)}
-                                    title={m.label}
-                                  >
-                                    <span className="label">{m.id}</span>
-                                    {m.pricing ? (
-                                      <span className="meta">{m.pricing}</span>
-                                    ) : null}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="nano-status">
-                                  No models loaded yet.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div
-                      className="settings-row"
-                      style={{
-                        display:
-                          config.provider === "openrouter" ||
-                          config.provider === "nanogpt"
-                            ? "grid"
-                            : "none",
-                      }}
-                    >
-                      <div className="row-label">API Key</div>
-                      <div className="row-content">
-                        <input
-                          className="field"
-                          id="api-key"
-                          type="password"
-                          value={providerApiKey || ""}
-                          placeholder={
-                            config.provider === "openrouter"
-                              ? serverDefaults.hasApiKey && !providerApiKey
-                                ? "Using server default"
-                                : ""
-                              : config.provider === "nanogpt" &&
-                                  serverDefaults.hasNanoApiKey &&
-                                  !providerApiKey
-                                ? "Using server default"
-                                : ""
-                          }
-                          onChange={(e) =>
-                            setConfig((prev) => {
-                              if (prev.provider === "openrouter") {
-                                return {
-                                  ...prev,
-                                  apiKeyOpenrouter: e.target.value,
-                                };
-                              }
-                              if (prev.provider === "nanogpt") {
-                                return {
-                                  ...prev,
-                                  apiKeyNanogpt: e.target.value,
-                                };
-                              }
-                              return prev;
-                            })
-                          }
-                          autoComplete="off"
-                        />
-                        <div className="row-helpers">
-                          <button
-                            type="button"
-                            className="mini-btn"
-                            onClick={() => {
-                              const el = document.getElementById(
-                                "api-key",
-                              ) as HTMLInputElement | null;
-                              if (!el) return;
-                              el.type =
-                                el.type === "password" ? "text" : "password";
-                            }}
-                          >
-                            Show
-                          </button>
-                          <button
-                            type="button"
-                            className="mini-btn"
-                            onClick={() =>
-                              navigator.clipboard
-                                .writeText(providerApiKey || "")
-                                .catch(() => undefined)
-                            }
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="settings-row"
-                      style={{
-                        display: config.provider === "local" ? "grid" : "none",
-                      }}
-                    >
-                      <div className="row-label">Local URL</div>
-                      <div className="row-content">
-                        <input
-                          className="field"
-                          id="local-url"
-                          value={config.localUrl}
-                          onChange={(e) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              localUrl: e.target.value,
-                            }))
-                          }
-                          autoComplete="off"
-                        />
-                      </div>
-                    </div>
-
-                    <div
-                      className="settings-row"
-                      style={{
-                        display:
-                          config.provider === "nanogpt" ? "grid" : "none",
-                      }}
-                    >
-                      <div className="row-label">Image Model</div>
-                      <div
-                        className="row-content"
-                        style={{
-                          flexDirection: "column",
-                          alignItems: "stretch",
-                          gap: "10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
-                        >
-                          <input
-                            className="field"
-                            id="image-model"
-                            value={config.imageModel || ""}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                imageModel: e.target.value,
-                              }))
-                            }
-                            placeholder="e.g., chroma, hidream"
-                            autoComplete="off"
-                          />
-                        </div>
-                        <div className="nano-models">
-                          <div className="nano-status">
-                            Available image models for IMG button:
-                          </div>
-                          <div className="nano-model-list">
-                            {nanoImageModels.map((m) => (
-                              <button
-                                type="button"
-                                key={m.id}
-                                className={clsx("model-pill", {
-                                  active: config.imageModel === m.id,
-                                })}
-                                onClick={() =>
-                                  setConfig((prev) => ({
-                                    ...prev,
-                                    imageModel: m.id,
-                                  }))
-                                }
-                                title={`${m.name} - ${m.resolutions.join(", ")}`}
-                              >
-                                <span className="label">{m.name}</span>
-                                <span className="meta">{m.pricing}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="settings-row"
-                      style={{
-                        display:
-                          config.provider === "nanogpt" ? "grid" : "none",
-                      }}
-                    >
-                      <div className="row-label">
-                        <button
-                          type="button"
-                          className="expand-toggle"
-                          onClick={() =>
-                            setImageSettingsExpanded(!imageSettingsExpanded)
-                          }
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "var(--text)",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            padding: 0,
-                            width: "100%",
-                            textAlign: "left",
-                          }}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{
-                              transform: imageSettingsExpanded
-                                ? "rotate(90deg)"
-                                : "rotate(0deg)",
-                              transition: "transform 0.2s ease",
-                            }}
-                          >
-                            <path d="M9 18l6-6-6-6" />
-                          </svg>
-                          Image Generation Settings
-                        </button>
-                      </div>
-                      <div className="row-content">
-                        <div
-                          style={{ fontSize: "12px", color: "var(--muted)" }}
-                        >
-                          Configure size, steps, and other parameters
-                        </div>
-                      </div>
-                    </div>
-
-                    {imageSettingsExpanded && config.provider === "nanogpt" && (
-                      <>
-                        <div className="settings-row image-setting">
-                          <div className="row-label">Image Size</div>
-                          <div className="row-content">
-                            <select
-                              className="field"
-                              value={config.imageSize}
-                              onChange={(e) =>
-                                setConfig((prev) => ({
-                                  ...prev,
-                                  imageSize: e.target.value,
-                                }))
-                              }
-                            >
-                              <option value="256x256">256x256</option>
-                              <option value="512x512">512x512</option>
-                              <option value="768x1024">
-                                768x1024 (Portrait)
-                              </option>
-                              <option value="576x1024">
-                                576x1024 (Portrait 9:16)
-                              </option>
-                              <option value="1024x768">
-                                1024x768 (Landscape)
-                              </option>
-                              <option value="1024x576">
-                                1024x576 (Landscape 16:9)
-                              </option>
-                              <option value="1024x1024">
-                                1024x1024 (Square)
-                              </option>
-                              <option value="1920x1088">
-                                1920x1088 (Landscape HD)
-                              </option>
-                              <option value="1088x1920">
-                                1088x1920 (Portrait HD)
-                              </option>
-                              <option value="1408x1024">
-                                1408x1024 (Landscape Wide)
-                              </option>
-                              <option value="1024x1408">
-                                1024x1408 (Portrait Tall)
-                              </option>
-                              <option value="2048x2048">
-                                2048x2048 (Large Square)
-                              </option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="settings-row image-setting">
-                          <div className="row-label">Steps</div>
-                          <div className="row-content">
-                            <input
-                              type="number"
-                              className="field"
-                              min="1"
-                              max="100"
-                              value={config.imageSteps}
-                              onChange={(e) =>
-                                setConfig((prev) => ({
-                                  ...prev,
-                                  imageSteps:
-                                    parseInt(e.target.value, 10) || 30,
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div className="settings-row image-setting">
-                          <div className="row-label">Guidance Scale</div>
-                          <div className="row-content">
-                            <input
-                              type="number"
-                              className="field"
-                              min="0"
-                              max="20"
-                              step="0.1"
-                              value={config.imageGuidanceScale}
-                              onChange={(e) =>
-                                setConfig((prev) => ({
-                                  ...prev,
-                                  imageGuidanceScale:
-                                    parseFloat(e.target.value) || 7.5,
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div className="settings-row image-setting">
-                          <div className="row-label">Seed (Optional)</div>
-                          <div className="row-content">
-                            <input
-                              type="number"
-                              className="field"
-                              min="0"
-                              placeholder="Random"
-                              value={config.imageSeed || ""}
-                              onChange={(e) =>
-                                setConfig((prev) => ({
-                                  ...prev,
-                                  imageSeed: e.target.value
-                                    ? parseInt(e.target.value, 10)
-                                    : undefined,
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="settings-row">
-                      <div className="row-label">System Prompt</div>
-                      <div className="row-content">
-                        <textarea
-                          className="field field-textarea"
-                          id="system-prompt"
-                          value={config.systemPrompt}
-                          onChange={(e) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              systemPrompt: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div
-                      id="config-status"
-                      className={clsx("config-status", {
-                        ok: statusMsg?.ok,
-                        err: statusMsg?.ok === false,
-                      })}
-                    >
-                      {statusMsg?.text}
-                    </div>
-
-                    <div className="settings-actions">
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={resetToDefaults}
-                        title="Reset settings to server defaults"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={testConnection}
-                        disabled={isTesting}
-                      >
-                        Test Connection
-                      </button>
-                      <div style={{ flex: 1 }} />
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={() => setShowConfig(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="chip primary"
-                        onClick={saveConfigFromModal}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="section">
-                    <div className="section-title">Keyboard Shortcuts</div>
-                    <div
-                      style={{
-                        marginBottom: "20px",
-                        color: "var(--muted)",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Click on a shortcut to record a new key combination.
-                    </div>
-
-                    {SHORTCUT_CONFIGS.map((config) => {
-                      const currentKey =
-                        customShortcuts[config.action] || config.defaultKey;
-                      const isEditing = editingShortcut === config.action;
-                      const hasConflict =
-                        recordingKey &&
-                        isEditing &&
-                        SHORTCUT_CONFIGS.some(
-                          (c) =>
-                            c.action !== config.action &&
-                            (customShortcuts[c.action] || c.defaultKey) ===
-                              recordingKey,
-                        );
-
-                      return (
-                        <div
-                          key={config.action}
-                          className="settings-row"
-                          style={{ alignItems: "center" }}
-                        >
-                          <div className="row-label">{config.label}</div>
-                          <div className="row-content">
-                            {isEditing ? (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "8px",
-                                }}
-                              >
-                                <input
-                                  className="field"
-                                  value={
-                                    recordingKey
-                                      ? formatShortcutDisplay(recordingKey)
-                                      : "Press a key combination..."
-                                  }
-                                  readOnly
-                                  style={{
-                                    cursor: "pointer",
-                                    background: hasConflict
-                                      ? "var(--error-bg, #fee)"
-                                      : "var(--input-bg)",
-                                  }}
-                                  onKeyDown={(e) => {
-                                    e.preventDefault();
-                                    const parsed = parseKeyboardEvent(
-                                      e.nativeEvent,
-                                    );
-                                    if (parsed) {
-                                      setRecordingKey(parsed);
-                                    }
-                                  }}
-                                />
-                                {hasConflict && (
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "var(--error, #c00)",
-                                    }}
-                                  >
-                                    This shortcut is already in use
-                                  </div>
-                                )}
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                  <button
-                                    type="button"
-                                    className="mini-btn"
-                                    onClick={() => {
-                                      if (
-                                        recordingKey &&
-                                        isShortcutValid(recordingKey) &&
-                                        !hasConflict
-                                      ) {
-                                        setCustomShortcuts((prev) => ({
-                                          ...prev,
-                                          [config.action]: recordingKey,
-                                        }));
-                                        saveCustomShortcuts({
-                                          ...customShortcuts,
-                                          [config.action]: recordingKey,
-                                        });
-                                      }
-                                      setEditingShortcut(null);
-                                      setRecordingKey("");
-                                    }}
-                                    disabled={!recordingKey || !!hasConflict}
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="mini-btn"
-                                    onClick={() => {
-                                      setEditingShortcut(null);
-                                      setRecordingKey("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "10px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontFamily: "monospace",
-                                    padding: "8px 12px",
-                                    background: "var(--input-bg)",
-                                    borderRadius: "6px",
-                                    fontSize: "14px",
-                                    minWidth: "120px",
-                                  }}
-                                >
-                                  {formatShortcutDisplay(currentKey)}
-                                </div>
-                                <button
-                                  type="button"
-                                  className="mini-btn"
-                                  onClick={() => {
-                                    setEditingShortcut(config.action);
-                                    setRecordingKey("");
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                                {customShortcuts[config.action] && (
-                                  <button
-                                    type="button"
-                                    className="mini-btn"
-                                    onClick={() => {
-                                      const updated = { ...customShortcuts };
-                                      delete updated[config.action];
-                                      setCustomShortcuts(updated);
-                                      saveCustomShortcuts(updated);
-                                    }}
-                                  >
-                                    Reset
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div style={{ marginTop: "20px" }}>
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={() => {
-                          setCustomShortcuts({});
-                          saveCustomShortcuts({});
-                          setEditingShortcut(null);
-                          setRecordingKey("");
-                        }}
-                      >
-                        Reset All to Defaults
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsModal
+        show={showConfig}
+        onClose={() => setShowConfig(false)}
+        settingsTab={settingsTab}
+        setSettingsTab={setSettingsTab}
+        theme={theme}
+        setTheme={setTheme}
+        config={config}
+        setConfig={setConfig}
+        serverDefaults={serverDefaults}
+        statusMsg={statusMsg}
+        isTesting={isTesting}
+        onTest={testConnection}
+        onReset={resetToDefaults}
+        onSave={saveConfigFromModal}
+        providerApiKey={providerApiKey}
+        setProvider={setProvider}
+        nanoModelScope={nanoModelScope}
+        setNanoModelScope={setNanoModelScope}
+        nanoModelQuery={nanoModelQuery}
+        setNanoModelQuery={setNanoModelQuery}
+        nanoModelsStatus={nanoModelsStatus}
+        nanoModelsLoading={nanoModelsLoading}
+        nanoModelsFetchedAt={nanoModelsFetchedAt}
+        filteredNanoModels={filteredNanoModels}
+        applyNanoModel={applyNanoModel}
+        fetchNanoModels={fetchNanoModels}
+        openrouterModelQuery={openrouterModelQuery}
+        setOpenrouterModelQuery={setOpenrouterModelQuery}
+        openrouterModelsStatus={openrouterModelsStatus}
+        openrouterModelsLoading={openrouterModelsLoading}
+        openrouterModelsFetchedAt={openrouterModelsFetchedAt}
+        filteredOpenrouterModels={filteredOpenrouterModels}
+        applyOpenrouterModel={applyOpenrouterModel}
+        fetchOpenrouterModels={fetchOpenrouterModels}
+        imageSettingsExpanded={imageSettingsExpanded}
+        setImageSettingsExpanded={setImageSettingsExpanded}
+        nanoImageModelScope={nanoImageModelScope}
+        setNanoImageModelScope={setNanoImageModelScope}
+        nanoImageModelQuery={nanoImageModelQuery}
+        setNanoImageModelQuery={setNanoImageModelQuery}
+        nanoImageModelsStatus={nanoImageModelsStatus}
+        nanoImageModelsLoading={nanoImageModelsLoading}
+        nanoImageModelsFetchedAt={nanoImageModelsFetchedAt}
+        filteredNanoImageModels={filteredNanoImageModels}
+        applyNanoImageModel={applyNanoImageModel}
+        fetchNanoImageModels={fetchNanoImageModels}
+        imageResolutionOptions={imageResolutionOptions}
+        activeImageModel={activeImageModel}
+        nanoImageModels={nanoImageModels}
+        customShortcuts={customShortcuts}
+        setCustomShortcuts={setCustomShortcuts}
+        editingShortcut={editingShortcut}
+        setEditingShortcut={setEditingShortcut}
+        recordingKey={recordingKey}
+        setRecordingKey={setRecordingKey}
+      />
 
       <input
         type="file"
@@ -3343,43 +2544,10 @@ export default function Page() {
   );
 }
 
-function AttachmentList({
-  attachments,
-  removeAttachment,
-}: {
-  attachments: any[];
-  removeAttachment: (idx: number) => void;
-}) {
-  return (
-    <div className="attach-list" id="hero-attachments">
-      {attachments.map((a, idx) => {
-        const ext = a.kind === "image" ? "image" : extOf(a.name) || a.kind;
-        return (
-          <span key={`${a.name}-${idx}`} className="attach-chip">
-            <span className="ext">{ext}</span> {a.name}{" "}
-            <button
-              type="button"
-              title="Remove"
-              onClick={() => removeAttachment(idx)}
-            >
-              ×
-            </button>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-function extOf(name: string) {
-  const m = name?.match(/\.([^.]+)$/);
-  return m ? m[1].toLowerCase() : "";
-}
-
-async function readAttachment(file: File) {
+async function readAttachment(file: File): Promise<Attachment | null> {
   const name = file.name;
   const type = (file.type || "").toLowerCase();
-  const ext = extOf(name);
+  const ext = name?.match(/\.([^.]+)$/)?.[1]?.toLowerCase() || "";
   try {
     if (
       type.startsWith("image/") ||

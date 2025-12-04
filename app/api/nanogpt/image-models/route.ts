@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import {
-  getNanoAllModelsUrl,
-  getNanoPaidModelsUrl,
-  getNanoSubscriptionModelsUrl,
+  getNanoPaidImageModelsUrl,
+  getNanoSubscriptionImageModelsUrl,
 } from "@/lib/nanogpt";
 
 type CacheKey = string;
 type CacheEntry = { data: any; fetchedAt: number };
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const nanoModelCache = new Map<CacheKey, CacheEntry>();
+const nanoImageModelCache = new Map<CacheKey, CacheEntry>();
 
 function cacheKey(
   credential: string,
@@ -19,33 +18,29 @@ function cacheKey(
   return `${scope}::${credential || "none"}::${detailed ? "detailed" : "basic"}`;
 }
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const buildModelsUrl = () =>
-  getNanoSubscriptionModelsUrl(false, env.nanogptBaseUrl);
-const _buildAllModelsUrl = () => getNanoAllModelsUrl(env.nanogptBaseUrl);
-const buildPaidModelsUrl = (detailed: boolean) =>
-  getNanoPaidModelsUrl(detailed, env.nanogptBaseUrl);
-
 function extractModels(data: any, scope: "subscription" | "paid") {
+  if (!data) return [];
+
   if (scope === "paid") {
+    if (Array.isArray(data?.models)) return data.models;
     if (Array.isArray(data?.data)) return data.data;
-    const textModels = data?.models?.text;
-    if (textModels && typeof textModels === "object") {
-      return Object.values(textModels);
+    if (data?.models?.image && typeof data.models.image === "object") {
+      return Object.values(data.models.image);
+    }
+    if (data?.models && typeof data.models === "object") {
+      return Object.values(data.models);
     }
     if (Array.isArray(data)) return data;
   }
 
-  return Array.isArray(data)
-    ? data
-    : Array.isArray(data?.data)
-      ? data.data
-      : Array.isArray((data as any)?.models)
-        ? (data as any).models
-        : [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray((data as any)?.models)) return (data as any).models;
+  return [];
 }
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   let body: any = {};
@@ -76,15 +71,16 @@ export async function POST(request: Request) {
 
   const url =
     scope === "paid"
-      ? buildPaidModelsUrl(detailed)
-      : buildModelsUrl() + (detailed ? "?detailed=true" : "");
+      ? getNanoPaidImageModelsUrl(detailed, env.nanogptBaseUrl)
+      : getNanoSubscriptionImageModelsUrl(detailed, env.nanogptBaseUrl);
+
   const key = cacheKey(
     scope === "subscription" ? apiKey : paidToken,
     detailed,
     scope,
   );
 
-  const cached = nanoModelCache.get(key);
+  const cached = nanoImageModelCache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json(cached.data);
   }
@@ -108,7 +104,7 @@ export async function POST(request: Request) {
     if (!resp.ok) {
       return NextResponse.json(
         {
-          error: "NanoGPT model fetch failed",
+          error: "NanoGPT image model fetch failed",
           status: resp.status,
           body: data,
         },
@@ -117,13 +113,15 @@ export async function POST(request: Request) {
     }
 
     const models = extractModels(data, scope);
-
     const payload = { models, raw: data };
-    nanoModelCache.set(key, { data: payload, fetchedAt: Date.now() });
+    nanoImageModelCache.set(key, { data: payload, fetchedAt: Date.now() });
     return NextResponse.json(payload);
   } catch (error) {
     return NextResponse.json(
-      { error: "Request to NanoGPT failed", details: (error as Error).message },
+      {
+        error: "Request to NanoGPT failed",
+        details: (error as Error).message,
+      },
       { status: 502 },
     );
   }

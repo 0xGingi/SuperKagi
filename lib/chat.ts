@@ -10,6 +10,7 @@ import {
   withDefaults,
 } from "./env";
 import { callMcpTool, getMcpTools, warmMcpClient } from "./mcp";
+import { getNanoApiBase } from "./nanogpt";
 import {
   recordNanogptCost,
   recordOpenrouterCost,
@@ -46,9 +47,17 @@ export type ChatResult = {
   cost?: number | null;
   model?: string;
   usage?: UsageRecord;
+  reasoning?: string | null;
+  reasoning_details?: unknown;
 };
 
 export type ChatMeta = Pick<ChatResult, "cost" | "model" | "usage">;
+
+export type StreamChunk = {
+  content?: string;
+  reasoning?: string;
+  reasoning_details?: unknown;
+};
 
 function normalizeContent(content: any): any {
   if (content == null) return "";
@@ -100,7 +109,9 @@ function buildClient(config: NormalizedChatConfig) {
   const baseURL = isOpenRouter
     ? "https://openrouter.ai/api/v1"
     : isNano
-      ? config.nanoBaseUrl || env.nanogptBaseUrl
+      ? getNanoApiBase(config.nanoBaseUrl || env.nanogptBaseUrl, {
+          allowChatVariants: true,
+        })
       : config.localUrl;
   const apiKey = isOpenRouter || isNano ? config.apiKey : "no-key-needed";
   const defaultHeaders = isOpenRouter
@@ -207,7 +218,8 @@ export async function runChat(payload: ChatPayload): Promise<ChatResult> {
   }
 
   usage = (response as any)?.usage as UsageRecord | undefined;
-  modelUsed = ((response as any)?.model as string | undefined) || resolved.model;
+  modelUsed =
+    ((response as any)?.model as string | undefined) || resolved.model;
 
   if (resolved.provider === "openrouter" && usage) {
     const record = await recordOpenrouterCost({
@@ -227,8 +239,18 @@ export async function runChat(payload: ChatPayload): Promise<ChatResult> {
     cost = record?.cost ?? null;
   }
 
+  const finalMessage: any = choice?.message ?? {};
+  const finalReasoning =
+    typeof finalMessage?.reasoning === "string"
+      ? finalMessage.reasoning
+      : typeof finalMessage?.reasoning_content === "string"
+        ? finalMessage.reasoning_content
+        : undefined;
+
   return {
-    content: choice?.message?.content ?? "[No content returned]",
+    content: finalMessage?.content ?? "[No content returned]",
+    reasoning: finalReasoning ?? null,
+    reasoning_details: finalMessage?.reasoning_details,
     cost,
     model: modelUsed,
     usage,
@@ -237,7 +259,7 @@ export async function runChat(payload: ChatPayload): Promise<ChatResult> {
 
 export async function streamChat(
   payload: ChatPayload,
-  onChunk: (text: string) => void,
+  onChunk: (chunk: StreamChunk) => void,
 ): Promise<ChatMeta> {
   const resolved = withDefaults(payload);
   const baseMessages = sanitizeMessages(payload.messages, payload.systemPrompt);
@@ -292,8 +314,17 @@ export async function streamChat(
       finishReason = choice.finish_reason || finishReason;
       const delta: any = choice.delta || {};
       if (typeof delta.content === "string" && delta.content.length) {
-        onChunk(delta.content);
+        onChunk({ content: delta.content });
       }
+      const reasoningDelta =
+        typeof delta.reasoning === "string"
+          ? delta.reasoning
+          : typeof delta.reasoning_content === "string"
+            ? delta.reasoning_content
+            : "";
+      if (reasoningDelta) onChunk({ reasoning: reasoningDelta });
+      if (delta.reasoning_details)
+        onChunk({ reasoning_details: delta.reasoning_details });
       if (Array.isArray(delta.tool_calls)) {
         for (const tc of delta.tool_calls) {
           const idx = typeof tc.index === "number" ? tc.index : 0;

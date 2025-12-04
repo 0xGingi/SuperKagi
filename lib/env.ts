@@ -36,7 +36,7 @@ const deepSearch = parsed.DEEP_SEARCH
   : false;
 const openrouterApiKey = parsed.OPENROUTER_API_KEY || "";
 const nanogptApiKey = parsed.NANOGPT_API_KEY || "";
-const nanogptBaseUrl = parsed.NANOGPT_BASE_URL || "https://nano-gpt.com/v1";
+const nanogptBaseUrl = parsed.NANOGPT_BASE_URL || "https://nano-gpt.com/api/v1";
 const imageModelNanogpt = parsed.IMAGE_MODEL_NANOGPT || "chroma";
 const kagiApiKey = parsed.KAGI_API_KEY || "";
 const kagiEngine = parsed.KAGI_SUMMARIZER_ENGINE || "cecil";
