@@ -701,9 +701,19 @@ export function SettingsModal({
                                   onClick={() => applyNanoImageModel(m.id)}
                                   title={m.label}
                                 >
-                                  <span className="label">
-                                    {m.name || m.id}
-                                  </span>
+                                  <div className="model-pill-header">
+                                    <span className="label">
+                                      {m.name || m.id}
+                                    </span>
+                                    {m.supportsImg2Img ? (
+                                      <span
+                                        className="model-pill-tag"
+                                        title="Supports image editing (img2img)"
+                                      >
+                                        Img2Img
+                                      </span>
+                                    ) : null}
+                                  </div>
                                   {metaParts.length ? (
                                     <span className="meta">
                                       {metaParts.join(" • ")}

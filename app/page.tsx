@@ -1226,7 +1226,7 @@ export default function Page() {
               .join("\n")
           : "";
     if (!text) return null;
-    const match = text.match(/\[image\]\s*generate:\s*(.+)/i);
+    const match = text.match(/\[image\]\s*(?:generate|edit):\s*(.+)/i);
     if (match && match[1]) return match[1].trim();
     return null;
   }
@@ -1462,6 +1462,10 @@ export default function Page() {
     setChats((prev) => ({ ...prev, [chatId]: nextThread }));
     setSidebarOpen(false);
 
+    const imageAttachment = attachments.find(
+      (a) => a.kind === "image" && typeof a.url === "string" && a.url.length,
+    );
+    const supportsImg2Img = !!activeImageModel?.supportsImg2Img;
     try {
       const res = await fetch("/api/images/generations", {
         method: "POST",
@@ -1474,6 +1478,9 @@ export default function Page() {
           guidance_scale: config.imageGuidanceScale,
           seed: config.imageSeed,
           apiKey: getProviderApiKey("nanogpt"),
+          ...(supportsImg2Img && imageAttachment?.url
+            ? { imageDataUrl: imageAttachment.url }
+            : {}),
         }),
       });
 
@@ -1797,6 +1804,73 @@ export default function Page() {
     return { size: defaultSize, steps, guidance, resolutions };
   }
 
+  function normalizeImageModelTagValue(value: unknown) {
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      return normalized || null;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value).toLowerCase();
+    }
+    return null;
+  }
+
+  function hasImageModelImg2ImgSupport(model: any) {
+    if (!model) return false;
+    const flagKeys = [
+      "supportsMultipleImg2Img",
+      "supportsImg2Img",
+      "supports_img2img",
+      "supportsImageEdit",
+      "supports_image_edit",
+      "supports_image_editing",
+      "supportsImageToImage",
+      "supports_image_to_image",
+      "requiresSwapAndTargetImages",
+    ];
+    for (const key of flagKeys) {
+      if (Boolean((model as any)[key])) return true;
+    }
+
+    const normalizedList = [
+      ...(Array.isArray(model?.tags) ? model.tags : []),
+      ...(Array.isArray(model?.capabilities) ? model.capabilities : []),
+    ];
+    const matchTag = (value: unknown) => {
+      const normalized = normalizeImageModelTagValue(value);
+      if (!normalized) return false;
+      return (
+        normalized.includes("img2img") ||
+        normalized.includes("image-edit") ||
+        normalized.includes("image-to-image")
+      );
+    };
+    if (normalizedList.some(matchTag)) return true;
+    const iconLabel = normalizeImageModelTagValue(model?.iconLabel);
+    if (iconLabel && matchTag(iconLabel)) return true;
+    return false;
+  }
+
+  function buildImageModelTags(model: any, supportsImg2Img: boolean) {
+    const tags = new Set<string>();
+    const addTag = (value: unknown) => {
+      const normalized = normalizeImageModelTagValue(value);
+      if (normalized) tags.add(normalized);
+    };
+    if (Array.isArray(model?.tags)) model.tags.forEach(addTag);
+    if (Array.isArray(model?.capabilities))
+      model.capabilities.forEach(addTag);
+    addTag(model?.iconLabel);
+    addTag(model?.category);
+    addTag(model?.provider);
+    addTag(model?.engine);
+    if (supportsImg2Img) {
+      tags.add("img2img");
+      tags.add("image-edit");
+    }
+    return tags.size ? Array.from(tags) : undefined;
+  }
+
   function extractImagePriceMap(model: any) {
     const pricing =
       model?.pricing?.per_image ||
@@ -1836,6 +1910,8 @@ export default function Page() {
             : undefined;
         const labelBase = item.name || id;
         const meta = [pricing, defaults.size].filter(Boolean).join(" • ");
+        const supportsImg2Img = hasImageModelImg2ImgSupport(item);
+        const tags = buildImageModelTags(item, supportsImg2Img);
         return {
           id: String(id),
           label: meta ? `${labelBase} · ${meta}` : String(labelBase),
@@ -1849,6 +1925,8 @@ export default function Page() {
           pricePerResolution,
           currency: item?.pricing?.currency || item?.currency,
           baseCost: minPrice,
+          supportsImg2Img,
+          tags,
         };
       })
       .filter(Boolean) as ImageModelOption[];
@@ -2255,7 +2333,8 @@ export default function Page() {
     return nanoImageModels.filter(
       (m) =>
         m.id.toLowerCase().includes(q) ||
-        (m.label && m.label.toLowerCase().includes(q)),
+        (m.label && m.label.toLowerCase().includes(q)) ||
+        (m.tags?.some((tag) => tag.includes(q)) ?? false),
     );
   }, [nanoImageModels, nanoImageModelQuery]);
 

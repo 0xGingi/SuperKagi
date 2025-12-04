@@ -43,6 +43,8 @@ export type ImageModelOption = {
   pricePerResolution?: Record<string, number>;
   currency?: string;
   baseCost?: number;
+  supportsImg2Img?: boolean;
+  tags?: string[];
 };
 
 export type UiConfig = {
