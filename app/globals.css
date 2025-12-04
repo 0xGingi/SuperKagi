@@ -19,7 +19,7 @@
   --bg-chip: #151515;
   --bg-chip-hover: #1a1a1a;
   --border-hover: #2e2e2e;
-  --content-gutter: clamp(16px, 2vw, 28px);
+  --content-gutter: 16px;
   --sidebar-width: 260px;
   --content-max: calc(100vw - var(--sidebar-width) - (var(--content-gutter) * 2));
   --content-narrow-max: var(--content-max);
@@ -396,7 +396,8 @@ a {
 .chat-area {
   position: absolute;
   inset: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px var(--content-gutter) 140px;
   display: flex;
   flex-direction: column;
@@ -514,11 +515,14 @@ a {
 
 .message {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin: 4px 0;
+  min-width: 0;
 }
 
 .message.user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .bubble {
@@ -745,20 +749,22 @@ a {
   }
 }
 
-.message-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px;
-  align-items: flex-start;
-  min-width: 0;
-}
-
 .message-actions {
   display: flex;
   gap: 6px;
   align-items: center;
   opacity: 0;
+  width: 100%;
   transition: opacity 0.2s ease;
+  justify-content: flex-start;
+}
+
+.message.user .bubble {
+  align-self: flex-end;
+}
+
+.message.user .message-actions {
+  justify-content: flex-end;
 }
 
 .message:hover .message-actions,
@@ -769,8 +775,12 @@ a {
 .message-meta {
   font-size: 12px;
   color: var(--muted);
+  text-align: left;
+  margin: 0;
+}
+
+.message.user .message-meta {
   text-align: right;
-  margin: 6px 0 0 0;
 }
 
 .mini-btn.ghost {
@@ -822,13 +832,8 @@ a {
     --content-gutter: 16px;
   }
 
-  .message-row {
-    grid-template-columns: 1fr;
-  }
-
   .message-actions {
     opacity: 1;
-    justify-content: flex-start;
   }
 
   .thread-toolbar {

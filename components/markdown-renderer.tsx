@@ -91,8 +91,14 @@ export function MarkdownRenderer({
       <style jsx>{`
         .markdown-content {
           line-height: 1.5;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          word-break: break-word;
+          overflow-wrap: anywhere;
         }
-        
+
         .markdown-content h1,
         .markdown-content h2,
         .markdown-content h3,
@@ -103,33 +109,33 @@ export function MarkdownRenderer({
           font-weight: 600;
           color: inherit;
         }
-        
+
         .markdown-content h1 {
           font-size: 1.25rem;
         }
-        
+
         .markdown-content h2 {
           font-size: 1.15rem;
         }
-        
+
         .markdown-content h3 {
           font-size: 1.1rem;
         }
-        
+
         .markdown-content p {
           margin: 0.5rem 0;
         }
-        
+
         .markdown-content ul,
         .markdown-content ol {
           margin: 0.5rem 0;
           padding-left: 1.5rem;
         }
-        
+
         .markdown-content li {
           margin: 0.25rem 0;
         }
-        
+
         .markdown-content blockquote {
           margin: 0.5rem 0;
           padding-left: 1rem;
@@ -137,14 +143,22 @@ export function MarkdownRenderer({
           color: var(--muted);
           font-style: italic;
         }
-        
+
         .code-block-wrapper {
           margin: 0.5rem 0;
           border-radius: 8px;
           overflow: hidden;
           border: 1px solid var(--border);
         }
-        
+
+        .code-block-wrapper,
+        .code-block-wrapper pre,
+        .code-block-wrapper pre code {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
         .code-block-header {
           background: var(--panel-2);
           padding: 0.5rem 1rem;
@@ -152,71 +166,85 @@ export function MarkdownRenderer({
           font-size: 0.875rem;
           color: var(--muted);
         }
-        
+
         .code-block-header .code-language {
           text-transform: uppercase;
           font-weight: 600;
           letter-spacing: 0.05em;
         }
-        
+
         .markdown-content pre {
           margin: 0;
           padding: 1rem;
           overflow-x: auto;
           background: var(--panel);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          white-space: pre;
         }
-        
+
         .markdown-content pre code {
           background: transparent;
           padding: 0;
           border-radius: 0;
           font-size: 13px;
+          white-space: pre;
+          word-break: break-word;
         }
-        
+
         .markdown-content code:not(pre code) {
           background: rgba(255, 255, 255, 0.1);
           padding: 0.125rem 0.375rem;
           border-radius: 4px;
           font-size: 0.875rem;
         }
-        
+
         .markdown-link {
           color: inherit;
           text-decoration: underline;
           text-underline-offset: 2px;
         }
-        
+
         .markdown-link:hover {
           opacity: 0.8;
         }
-        
+
         .markdown-image {
           max-width: 100%;
           height: auto;
           border-radius: 8px;
           margin: 0.5rem 0;
         }
-        
+
         .markdown-content hr {
           border: none;
           border-top: 1px solid var(--border);
           margin: 1rem 0;
         }
-        
+
+        @media (max-width: 960px) {
+          .markdown-content pre,
+          .markdown-content pre code {
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+        }
+
         /* Light theme adjustments */
         :global(.light) .code-block-wrapper {
           border-color: #e0e0e0;
         }
-        
+
         :global(.light) .code-block-header {
           background: #f8f9fa;
           border-bottom-color: #e0e0e0;
         }
-        
+
         :global(.light) .markdown-content pre {
           background: #f8f9fa;
         }
-        
+
         :global(.light) .markdown-content code:not(pre code) {
           background: rgba(0, 0, 0, 0.05);
         }

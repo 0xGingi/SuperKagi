@@ -230,94 +230,92 @@ export function ChatThread({
 
         return (
           <div key={messageId} className={clsx("message", msg.role)}>
-            <div className="message-row">
-              <div
-                className={clsx("bubble", msg.role, {
-                  typing: msg.pending,
-                })}
-              >
-                {isEditingMessage ? (
-                  <div className="edit-block">
-                    <textarea
-                      className="field field-textarea"
-                      ref={editInputRef}
-                      value={editDraft}
-                      onChange={(e) => onEditDraftChange(e.target.value)}
-                      rows={Math.max(3, editDraft.split("\n").length)}
-                    />
-                    <div className="edit-actions">
-                      <button
-                        type="button"
-                        className="chip primary"
-                        onClick={onSaveEdit}
-                      >
-                        Save &amp; resend
-                      </button>
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={onCancelEdit}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+            <div
+              className={clsx("bubble", msg.role, {
+                typing: msg.pending,
+              })}
+            >
+              {isEditingMessage ? (
+                <div className="edit-block">
+                  <textarea
+                    className="field field-textarea"
+                    ref={editInputRef}
+                    value={editDraft}
+                    onChange={(e) => onEditDraftChange(e.target.value)}
+                    rows={Math.max(3, editDraft.split("\n").length)}
+                  />
+                  <div className="edit-actions">
+                    <button
+                      type="button"
+                      className="chip primary"
+                      onClick={onSaveEdit}
+                    >
+                      Save &amp; resend
+                    </button>
+                    <button
+                      type="button"
+                      className="chip"
+                      onClick={onCancelEdit}
+                    >
+                      Cancel
+                    </button>
                   </div>
-                ) : (
-                  <>
-                    {showReasoning && msg.reasoning ? (
-                      <div
-                        className="reasoning-block"
-                        aria-label="Model reasoning"
-                      >
-                        <div className="reasoning-label">Reasoning</div>
-                        <MarkdownRenderer
-                          content={msg.reasoning}
-                          className="reasoning-markdown"
-                        />
-                      </div>
-                    ) : null}
-                    {renderMessageContent(msg)}
-                    {msg.pending ? (
-                      <output className="typing-dots" aria-live="polite">
-                        <span className="dot" />
-                        <span className="dot" />
-                        <span className="dot" />
-                      </output>
-                    ) : null}
-                  </>
-                )}
-              </div>
-              <div className="message-actions">
+                </div>
+              ) : (
+                <>
+                  {showReasoning && msg.reasoning ? (
+                    <div
+                      className="reasoning-block"
+                      aria-label="Model reasoning"
+                    >
+                      <div className="reasoning-label">Reasoning</div>
+                      <MarkdownRenderer
+                        content={msg.reasoning}
+                        className="reasoning-markdown"
+                      />
+                    </div>
+                  ) : null}
+                  {renderMessageContent(msg)}
+                  {msg.pending ? (
+                    <output className="typing-dots" aria-live="polite">
+                      <span className="dot" />
+                      <span className="dot" />
+                      <span className="dot" />
+                    </output>
+                  ) : null}
+                </>
+              )}
+            </div>
+            <div className="message-actions">
+              <button
+                type="button"
+                className="mini-btn ghost"
+                title="Copy message"
+                onClick={() => onCopyMessage(msg)}
+              >
+                {isCopying ? "Copied" : "Copy"}
+              </button>
+              {canEdit && (
                 <button
                   type="button"
                   className="mini-btn ghost"
-                  title="Copy message"
-                  onClick={() => onCopyMessage(msg)}
+                  title="Edit message"
+                  onClick={() => onStartEdit(msg)}
                 >
-                  {isCopying ? "Copied" : "Copy"}
+                  Edit
                 </button>
-                {canEdit && (
-                  <button
-                    type="button"
-                    className="mini-btn ghost"
-                    title="Edit message"
-                    onClick={() => onStartEdit(msg)}
-                  >
-                    Edit
-                  </button>
-                )}
-                {canRegenerate && (
-                  <button
-                    type="button"
-                    className="mini-btn ghost"
-                    title="Regenerate response"
-                    onClick={() => onRegenerate(messageId)}
-                    disabled={isRegenerating}
-                  >
-                    {isRegenerating ? "…" : "Regenerate"}
-                  </button>
-                )}
-              </div>
+              )}
+              {canRegenerate && (
+                <button
+                  type="button"
+                  className="mini-btn ghost"
+                  title="Regenerate response"
+                  onClick={() => onRegenerate(messageId)}
+                  disabled={isRegenerating}
+                >
+                  {isRegenerating ? "…" : "Regenerate"}
+                </button>
+              )}
             </div>
             <div className="message-meta">
               {formatMessageTime(msg)}
