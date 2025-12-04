@@ -6,8 +6,12 @@ type CacheEntry = { data: any; fetchedAt: number };
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const nanoModelCache = new Map<CacheKey, CacheEntry>();
 
-function cacheKey(apiKey: string, detailed: boolean) {
-  return `${apiKey || "none"}::${detailed ? "detailed" : "basic"}`;
+function cacheKey(
+  apiKey: string,
+  detailed: boolean,
+  scope: "subscription" | "all",
+) {
+  return `${scope}::${apiKey || "none"}::${detailed ? "detailed" : "basic"}`;
 }
 
 export const runtime = "nodejs";
@@ -21,6 +25,32 @@ function buildModelsUrl() {
   return `${withoutV1}/api/subscription/v1/models`;
 }
 
+function buildAllModelsUrl() {
+  const base = env.nanogptBaseUrl || "https://nano-gpt.com/v1";
+  const trimmed = base.replace(/\/+$/, "");
+  const root = trimmed
+    .replace(/\/api\/subscription\/v1$/i, "")
+    .replace(/\/v1$/i, "");
+  return `${root}/api/models/text`;
+}
+
+function extractModels(data: any, scope: "subscription" | "all") {
+  if (scope === "all") {
+    const textModels = data?.models?.text;
+    if (textModels && typeof textModels === "object") {
+      return Object.values(textModels);
+    }
+  }
+
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray((data as any)?.models)
+        ? (data as any).models
+        : [];
+}
+
 export async function POST(request: Request) {
   let body: any = {};
   try {
@@ -32,16 +62,26 @@ export async function POST(request: Request) {
   const apiKey =
     (body.apiKey as string | undefined)?.trim() || env.nanogptApiKey;
   const detailed = !!body.detailed;
+  const scope: "subscription" | "all" =
+    body.scope === "all" ? "all" : "subscription";
+  const requireApiKey = scope === "subscription";
 
-  if (!apiKey) {
+  if (requireApiKey && !apiKey) {
     return NextResponse.json(
       { error: "Missing NanoGPT API key" },
       { status: 400 },
     );
   }
 
-  const url = buildModelsUrl() + (detailed ? "?detailed=true" : "");
-  const key = cacheKey(apiKey, detailed);
+  const url =
+    scope === "all"
+      ? buildAllModelsUrl()
+      : buildModelsUrl() + (detailed ? "?detailed=true" : "");
+  const key = cacheKey(
+    requireApiKey ? apiKey : "public",
+    detailed,
+    scope,
+  );
 
   const cached = nanoModelCache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -50,7 +90,7 @@ export async function POST(request: Request) {
 
   try {
     const resp = await fetch(url, {
-      headers: { "x-api-key": apiKey },
+      headers: requireApiKey ? { "x-api-key": apiKey } : undefined,
       cache: "no-store",
     });
     const text = await resp.text();
@@ -72,13 +112,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const models = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray((data as any)?.models)
-          ? (data as any).models
-          : [];
+    const models = extractModels(data, scope);
 
     const payload = { models, raw: data };
     nanoModelCache.set(key, { data: payload, fetchedAt: Date.now() });

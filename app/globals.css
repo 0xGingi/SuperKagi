@@ -962,8 +962,12 @@ a {
 
 .nano-model-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+.nano-scope-toggle {
+  display: flex;
 }
 
 .nano-status {
