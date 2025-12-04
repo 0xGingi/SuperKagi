@@ -8,6 +8,7 @@ let cachedTools: ChatCompletionTool[] | null = null;
 let toolsFetchedAt = 0;
 let toolsPromise: Promise<ChatCompletionTool[]> | null = null;
 const TOOLS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let warmupStarted = false;
 
 async function connectMcp(): Promise<Client> {
   const transport = new StdioClientTransport({
@@ -83,5 +84,15 @@ export async function callMcpTool(name: string, args: Record<string, unknown>) {
   const client = await getMcpClient();
   return client.callTool({ name, arguments: args }, undefined, {
     timeout: 300000,
+  });
+}
+
+export function warmMcpClient() {
+  if (warmupStarted || !env.kagiApiKey) return;
+  warmupStarted = true;
+  void getMcpTools().catch((error) => {
+    // Non-fatal; we'll try again on the next deep-search request.
+    console.warn("MCP warmup failed:", (error as Error).message);
+    warmupStarted = false;
   });
 }

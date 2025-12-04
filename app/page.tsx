@@ -866,7 +866,39 @@ export default function Page() {
     targetAssistantId?: string,
   ) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const stallAbortMs = config.deepSearch ? 120000 : 45000;
+    let lastChunkAt = Date.now();
+    let assembled = "";
+    let hasContent = false;
+    let latestCost: number | undefined;
+
+    const update = (finalize = false, errorText?: string) => {
+      setChats((prev) => {
+        const thread = [...(prev[chatId] || [])];
+        const idx =
+          targetAssistantId != null
+            ? thread.findIndex((m) => m.id === targetAssistantId)
+            : thread.length - 1;
+        if (idx >= 0 && thread[idx]?.role === "assistant") {
+          thread[idx] = {
+            ...thread[idx],
+            role: "assistant",
+            content: assembled,
+            pending: !finalize,
+            error: errorText,
+            cost: latestCost ?? thread[idx].cost,
+          };
+        }
+        return { ...prev, [chatId]: thread };
+      });
+    };
+
+    const watchdog = setInterval(() => {
+      const elapsed = Date.now() - lastChunkAt;
+      if (elapsed > stallAbortMs) {
+        controller.abort();
+      }
+    }, Math.max(5000, stallAbortMs / 6));
     try {
       const res = await fetch("/api/chat/stream", {
         method: "POST",
@@ -886,31 +918,7 @@ export default function Page() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let assembled = "";
       let finished = false;
-      let hasContent = false;
-      let latestCost: number | undefined;
-
-      const update = (finalize = false, errorText?: string) => {
-        setChats((prev) => {
-          const thread = [...(prev[chatId] || [])];
-          const idx =
-            targetAssistantId != null
-              ? thread.findIndex((m) => m.id === targetAssistantId)
-              : thread.length - 1;
-          if (idx >= 0 && thread[idx]?.role === "assistant") {
-            thread[idx] = {
-              ...thread[idx],
-              role: "assistant",
-              content: assembled,
-              pending: !finalize,
-              error: errorText,
-              cost: latestCost ?? thread[idx].cost,
-            };
-          }
-          return { ...prev, [chatId]: thread };
-        });
-      };
 
       while (true) {
         const { value, done } = await reader.read();
@@ -928,6 +936,7 @@ export default function Page() {
             finished = true;
             break;
           }
+          lastChunkAt = Date.now();
           try {
             const data = JSON.parse(payloadLine);
             if (data?.error) {
@@ -956,10 +965,18 @@ export default function Page() {
       }
       update(true);
     } catch (_err) {
-      setProviderError("Streaming error — retrying fallback.");
+      if (hasContent) {
+        update(true, "Stream interrupted; content may be incomplete.");
+        return;
+      }
+      setProviderError(
+        controller.signal.aborted
+          ? "Streaming stalled — retrying fallback."
+          : "Streaming error — retrying fallback.",
+      );
       await fallbackToSingle(chatId, payload, targetAssistantId);
     } finally {
-      clearTimeout(timeoutId);
+      clearInterval(watchdog);
     }
   }
 

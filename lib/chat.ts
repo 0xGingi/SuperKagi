@@ -9,8 +9,12 @@ import {
   type Provider,
   withDefaults,
 } from "./env";
-import { callMcpTool, getMcpTools } from "./mcp";
+import { callMcpTool, getMcpTools, warmMcpClient } from "./mcp";
 import { recordOpenrouterCost, type UsageRecord } from "./pricing";
+
+if (env.kagiApiKey) {
+  warmMcpClient();
+}
 
 type IncomingMessage = {
   role: "user" | "assistant" | "tool";
