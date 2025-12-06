@@ -1326,14 +1326,14 @@ export default function Page() {
         }}
         extraNav={
           <a
-            className="chip w-full"
+            className="nav-item-icon"
             href="/pricing"
             title="Pricing dashboard"
             aria-label="Pricing dashboard"
           >
             <svg
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1345,7 +1345,7 @@ export default function Page() {
               <path d="M7 13h3v6H7z" />
               <path d="M14 5h3v14h-3z" />
             </svg>
-            Pricing
+            <span>Pricing</span>
           </a>
         }
       />
