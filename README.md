@@ -8,7 +8,7 @@ A grok-inspired chat UI for local LLMs, OpenRouter, nano-gpt with Kagi Web Searc
 - <a href="https://help.kagi.com/kagi/api/search.html">Kagi Web Search</a> via <a href="https://github.com/kagisearch/kagimcp">KagiMCP</a> so the model can search, browse, and summarize the web during a chat.
 - Grok-Inspired UI
 
-<img width="1634" height="918" alt="image" src="https://github.com/user-attachments/assets/4e6715c3-ed8d-4bdc-a0df-6e2a27d55f94" />
+<img width="1718" height="930" alt="image" src="https://github.com/user-attachments/assets/6605ce9a-2439-45e8-8dd5-621c28836083" />
 
 
 ## Setup via Docker Compose
