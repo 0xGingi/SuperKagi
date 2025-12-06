@@ -179,49 +179,21 @@ export function ChatThread({
     >
       {thread.length ? (
         <div className="thread-toolbar">
-          <div className="thread-search">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search in this chat"
-              value={messageSearch}
-              onChange={(e) => setMessageSearch(e.target.value)}
-            />
-            {messageSearch ? (
-              <button
-                type="button"
-                className="mini-btn ghost"
-                onClick={() => setMessageSearch("")}
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div className="thread-meta">
-            {searchActive
-              ? `${visibleCount}/${totalCount} matches`
-              : `${totalCount} messages`}
-          </div>
-          <div className="thread-actions">
+          <div className="thread-info">
+            <span className="thread-meta">
+              {totalCount} messages
+            </span>
             <button
               type="button"
-              className="mini-btn ghost"
+              className={clsx("chip", "toggle", { active: showReasoning })}
               onClick={onToggleReasoning}
               aria-pressed={showReasoning}
             >
-              Reasoning: {showReasoning ? "Shown" : "Hidden"}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4M12 8h.01" />
+              </svg>
+              Reasoning
             </button>
           </div>
         </div>
@@ -241,7 +213,7 @@ export function ChatThread({
         const errorText =
           msg.error ||
           (typeof msg.content === "string" &&
-          msg.content.toLowerCase().startsWith("error:")
+            msg.content.toLowerCase().startsWith("error:")
             ? msg.content
             : "");
 

@@ -88,45 +88,44 @@ export default function PricingPage() {
           <h2>Recent calls</h2>
           <span className="hint">Showing latest {costs.length} records</span>
         </div>
-        <table className="pricing-table">
-          <thead>
-            <tr className="pricing-row head">
-              <th scope="col">Time</th>
-              <th scope="col">Provider</th>
-              <th scope="col">Type</th>
-              <th scope="col">Model</th>
-              <th scope="col">Prompt</th>
-              <th scope="col">Completion</th>
-              <th scope="col">Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {costs.length ? (
-              costs.map((row) => (
-                <tr
-                  className="pricing-row"
-                  key={row.id || `${row.provider}-${row.createdAt}`}
-                >
-                  <td>{formatDate(row.createdAt)}</td>
-                  <td className="mono">{row.provider}</td>
-                  <td className="mono">
-                    {(row.metadata as any)?.type === "image" ? "image" : "chat"}
-                  </td>
-                  <td className="mono">{row.model}</td>
-                  <td>{row.promptTokens ?? 0}</td>
-                  <td>{row.completionTokens ?? 0}</td>
-                  <td className="mono">{formatCurrency(row.cost)}</td>
-                </tr>
-              ))
-            ) : (
+        <div className="table-scroll">
+          <table className="pricing-table">
+            <thead>
               <tr>
-                <td className="pricing-empty" colSpan={7}>
-                  No cost data yet.
-                </td>
+                <th>Time</th>
+                <th>Provider</th>
+                <th>Type</th>
+                <th>Model</th>
+                <th>Prompt</th>
+                <th>Completion</th>
+                <th>Cost</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {costs.length ? (
+                costs.map((row) => (
+                  <tr key={row.id || `${row.provider}-${row.createdAt}`}>
+                    <td>{formatDate(row.createdAt)}</td>
+                    <td className="mono">{row.provider}</td>
+                    <td className="mono">
+                      {(row.metadata as any)?.type === "image" ? "image" : "chat"}
+                    </td>
+                    <td className="mono">{row.model}</td>
+                    <td>{row.promptTokens ?? 0}</td>
+                    <td>{row.completionTokens ?? 0}</td>
+                    <td className="mono">{formatCurrency(row.cost)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="pricing-empty" colSpan={7}>
+                    No cost data yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

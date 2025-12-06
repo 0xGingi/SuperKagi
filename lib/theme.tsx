@@ -1,48 +1,47 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type Theme = "dark" | "light" | "system";
 
-type ThemeProviderProps = {
-  children: React.ReactNode;
-  defaultTheme?: Theme;
-  storageKey?: string;
-};
-
-type ThemeProviderState = {
+type ThemeState = {
   theme: Theme;
-  setTheme: (theme: Theme) => void;
   resolvedTheme: "dark" | "light";
+  setTheme: (theme: Theme) => void;
+  setResolvedTheme: (theme: "dark" | "light") => void;
 };
 
-const initialState: ThemeProviderState = {
-  theme: "system",
-  setTheme: () => null,
-  resolvedTheme: "dark",
-};
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set) => ({
+      theme: "system",
+      resolvedTheme: "dark",
+      setTheme: (theme) => set({ theme }),
+      setResolvedTheme: (resolvedTheme) => set({ resolvedTheme }),
+    }),
+    {
+      name: "superkagi-theme",
+      partialize: (state) => ({ theme: state.theme }),
+    },
+  ),
+);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
-  storageKey = "superkagi-theme",
-  ...props
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
+}: {
+  children: React.ReactNode;
+  [key: string]: any;
+}) {
+  const { theme, setResolvedTheme } = useThemeStore();
 
-  useEffect(() => {
-    const stored = localStorage.getItem(storageKey) as Theme;
-    if (stored) {
-      setTheme(stored);
-    }
-  }, [storageKey]);
+  // Initialize with default if needed, though persist handles it.
+  // Actually, we might want to respect defaultTheme prop if storage is empty?
+  // But persist middleware usually handles hydration.
 
   useEffect(() => {
     const root = window.document.documentElement;
-
     root.classList.remove("light", "dark");
 
     let systemTheme: "dark" | "light" = "dark";
@@ -55,29 +54,28 @@ export function ThemeProvider({
     const finalTheme = theme === "system" ? systemTheme : theme;
     root.classList.add(finalTheme);
     setResolvedTheme(finalTheme);
-  }, [theme]);
+  }, [theme, setResolvedTheme]);
 
-  const value = {
-    theme,
-    setTheme: (theme: Theme) => {
-      localStorage?.setItem(storageKey, theme);
-      setTheme(theme);
-    },
-    resolvedTheme,
-  };
+  // Listen for system changes if theme is system
+  useEffect(() => {
+    if (theme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      const newLimit = media.matches ? "dark" : "light";
+      const root = window.document.documentElement;
+      root.classList.remove("light", "dark");
+      root.classList.add(newLimit);
+      setResolvedTheme(newLimit);
+    };
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [theme, setResolvedTheme]);
 
-  return (
-    <ThemeProviderContext.Provider {...props} value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  return <>{children}</>;
 }
 
+// Hook for backward compatibility
 export const useTheme = () => {
-  const context = useContext(ThemeProviderContext);
-
-  if (context === undefined)
-    throw new Error("useTheme must be used within a ThemeProvider");
-
-  return context;
+  const { theme, setTheme, resolvedTheme } = useThemeStore();
+  return { theme, setTheme, resolvedTheme };
 };

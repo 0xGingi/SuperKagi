@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -8,6 +9,60 @@ import remarkGfm from "remark-gfm";
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+}
+
+// Code block component with copy functionality
+function CodeBlock({ language, children }: { language: string; children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    const text = String(children).replace(/\n$/, '');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }, [children]);
+
+  return (
+    <div className="code-block-wrapper">
+      <div className="code-block-header">
+        <span className="code-language">{language}</span>
+        <div className="code-actions">
+          <button
+            type="button"
+            className="code-copy-btn"
+            onClick={handleCopy}
+            title={copied ? "Copied!" : "Copy code"}
+          >
+            {copied ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                Copied
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      <pre className={`hljs language-${language}`}>
+        <code className={`language-${language}`}>
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
 }
 
 export function MarkdownRenderer({
@@ -27,18 +82,7 @@ export function MarkdownRenderer({
             const inline = !className || !className.startsWith("language-");
 
             if (!inline && language) {
-              return (
-                <div className="code-block-wrapper">
-                  <div className="code-block-header">
-                    <span className="code-language">{language}</span>
-                  </div>
-                  <pre className={`hljs language-${language}`}>
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  </pre>
-                </div>
-              );
+              return <CodeBlock language={language}>{children}</CodeBlock>;
             }
 
             return (
@@ -160,17 +204,50 @@ export function MarkdownRenderer({
         }
 
         .code-block-header {
-          background: var(--panel-2);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #1a1a1a;
           padding: 0.5rem 1rem;
           border-bottom: 1px solid var(--border);
-          font-size: 0.875rem;
+          font-size: 0.75rem;
           color: var(--muted);
         }
 
         .code-block-header .code-language {
-          text-transform: uppercase;
-          font-weight: 600;
-          letter-spacing: 0.05em;
+          text-transform: capitalize;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+          color: #888;
+        }
+
+        .code-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .code-copy-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: transparent;
+          border: none;
+          color: var(--muted);
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: color 0.15s ease, background 0.15s ease;
+        }
+
+        .code-copy-btn:hover {
+          color: var(--text);
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .code-copy-btn svg {
+          flex-shrink: 0;
         }
 
         .markdown-content pre {
