@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-middleware";
 import {
   getChat,
   listChats,
@@ -11,9 +12,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const summaries = listChats();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const summaries = listChats(user.id);
     const chats = summaries
-      .map((c) => getChat(c.id))
+      .map((c) => getChat(c.id, user.id))
       .filter(Boolean) as StoredChat[];
     return NextResponse.json({ chats });
   } catch (error) {
@@ -27,6 +33,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
     const body = (await request.json()) as StoredChat;
     if (!body?.id || !Array.isArray(body.messages)) {
       return NextResponse.json(
@@ -34,7 +45,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    saveChat(body);
+    saveChat(body, user.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[persistence/chats] POST error", error);

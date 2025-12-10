@@ -10,11 +10,12 @@ interface UIState {
   composerValue: string;
   statusMsg: { text: string; ok?: boolean } | null;
   settingsTab:
-    | "settings"
-    | "connection"
-    | "textModels"
-    | "imageModels"
-    | "shortcuts";
+  | "settings"
+  | "connection"
+  | "textModels"
+  | "imageModels"
+  | "shortcuts"
+  | "users";
   customShortcuts: CustomShortcuts;
   editingShortcut: string | null;
   recordingKey: string;
@@ -32,7 +33,7 @@ interface UIState {
   setComposerValue: (value: string) => void;
   setStatusMsg: (msg: { text: string; ok?: boolean } | null) => void;
   setSettingsTab: (
-    tab: "settings" | "connection" | "textModels" | "imageModels" | "shortcuts",
+    tab: "settings" | "connection" | "textModels" | "imageModels" | "shortcuts" | "users",
   ) => void;
   setCustomShortcuts: (shortcuts: CustomShortcuts) => void;
   setEditingShortcut: (id: string | null) => void;

@@ -92,9 +92,10 @@ export const useModelStore = create<ModelState>()(
         set({ nanoImageModelsFetchedAt: at }),
 
       fetchNanoModels: async () => {
-        const { config } = useConfigStore.getState();
+        const { config, serverDefaults } = useConfigStore.getState();
         const apiKey = config.apiKeyNanogpt;
-        if (!apiKey) {
+        // Check if there's a client-side key OR server has a key configured
+        if (!apiKey && !serverDefaults.hasNanoApiKey) {
           set({ nanoModelsStatus: "Add a NanoGPT API key first." });
           return;
         }
@@ -133,9 +134,8 @@ export const useModelStore = create<ModelState>()(
             nanoModels: normalized,
             nanoModelsFetchedAt: Date.now(),
             nanoModelsStatus: normalized.length
-              ? `Loaded ${normalized.length} ${
-                  scope === "paid" ? "paid" : "subscription"
-                } models.`
+              ? `Loaded ${normalized.length} ${scope === "paid" ? "paid" : "subscription"
+              } models.`
               : scope === "paid"
                 ? "No models returned. Check NanoGPT API key."
                 : "No models returned. Check subscription/API key.",
@@ -199,13 +199,14 @@ export const useModelStore = create<ModelState>()(
       },
 
       fetchNanoImageModels: async () => {
-        const { config } = useConfigStore.getState();
+        const { config, serverDefaults } = useConfigStore.getState();
         const apiKey = config.apiKeyNanogpt;
         // Note: Original logic checked: if (!key && nanoImageModelScope === "subscription")
         // But generic check !key is safer/simpler to start with, or we can match logic.
         // Matching logic:
         const scope = get().nanoImageModelScope;
-        if (!apiKey && scope === "subscription") {
+        // Check if there's a client-side key OR server has a key configured
+        if (!apiKey && !serverDefaults.hasNanoApiKey && scope === "subscription") {
           set({ nanoImageModelsStatus: "Add a NanoGPT API key first." });
           return;
         }
@@ -245,9 +246,8 @@ export const useModelStore = create<ModelState>()(
             nanoImageModels: normalized,
             nanoImageModelsFetchedAt: Date.now(),
             nanoImageModelsStatus: normalized.length
-              ? `Loaded ${normalized.length} ${
-                  scope === "paid" ? "paid" : "subscription"
-                } image models.`
+              ? `Loaded ${normalized.length} ${scope === "paid" ? "paid" : "subscription"
+              } image models.`
               : scope === "paid"
                 ? "No image models returned. Check NanoGPT API key."
                 : "No image models returned. Check subscription/API key.",

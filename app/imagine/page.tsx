@@ -72,6 +72,31 @@ export default function ImaginePage() {
     fetchNanoImageModels,
   ]);
 
+  // Load images from server on mount
+  useEffect(() => {
+    const loadServerImages = async () => {
+      try {
+        const res = await fetch("/api/persistence/images", {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.images) && data.images.length > 0) {
+            // Replace local images with server images
+            const { images: localImages } = useImageStore.getState();
+            if (localImages.length === 0) {
+              // Only set from server if local is empty
+              useImageStore.setState({ images: data.images });
+            }
+          }
+        }
+      } catch {
+        // Silent fail - use local storage as fallback
+      }
+    };
+    loadServerImages();
+  }, []);
+
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return;
 
@@ -124,6 +149,18 @@ export default function ImaginePage() {
       };
 
       addImage(newImage);
+
+      // Save to server for persistence
+      try {
+        await fetch("/api/persistence/images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newImage),
+        });
+      } catch {
+        // Silent fail - local storage is still saved
+      }
+
       setPrompt("");
       setSourceImage(null);
     } catch (e) {
@@ -554,8 +591,22 @@ export default function ImaginePage() {
                 <button
                   type="button"
                   className="mini-btn danger"
-                  onClick={() => {
-                    if (confirm("Clear all generated images?")) clearAllImages();
+                  onClick={async () => {
+                    if (confirm("Clear all generated images?")) {
+                      // Get image IDs before clearing
+                      const imageIds = images.map((img) => img.id);
+                      clearAllImages();
+                      // Delete all from server
+                      for (const id of imageIds) {
+                        try {
+                          await fetch(`/api/persistence/images/${id}`, {
+                            method: "DELETE",
+                          });
+                        } catch {
+                          // Silent fail
+                        }
+                      }
+                    }
                   }}
                 >
                   Clear All
@@ -690,9 +741,17 @@ export default function ImaginePage() {
                 <button
                   type="button"
                   className="btn danger"
-                  onClick={() => {
+                  onClick={async () => {
                     removeImage(selectedImage.id);
                     setSelectedImageId(null);
+                    // Delete from server
+                    try {
+                      await fetch(`/api/persistence/images/${selectedImage.id}`, {
+                        method: "DELETE",
+                      });
+                    } catch {
+                      // Silent fail
+                    }
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

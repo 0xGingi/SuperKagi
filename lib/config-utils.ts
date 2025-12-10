@@ -96,15 +96,16 @@ export function mergeEnvDefaults(
   if (existing.models?.nanogpt && userSet.models.nanogpt)
     models.nanogpt = existing.models.nanogpt;
 
-  const provider = resolveProvider(existing.provider || env.provider);
-  const model =
-    existing.model ||
-    models[provider as keyof typeof models] ||
-    (provider === "openrouter"
-      ? models.openrouter
-      : provider === "nanogpt"
-        ? models.nanogpt
-        : models.local);
+  // Use env.provider as default, only use existing.provider if user explicitly set it
+  // (i.e., it differs from fallbackDefaults.provider which is "local")
+  const hasUserSetProvider = existing.provider && existing.provider !== fallbackDefaults.provider;
+  const provider = resolveProvider(hasUserSetProvider ? existing.provider : env.provider);
+
+  // Use the model for the resolved provider from env, unless user explicitly set it
+  const hasUserSetModel = userSet.models[provider as keyof typeof userSet.models];
+  const model = hasUserSetModel
+    ? (existing.model || models[provider as keyof typeof models])
+    : models[provider as keyof typeof models];
 
   return {
     ...base,

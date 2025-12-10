@@ -1,9 +1,12 @@
 "use client";
 
 import clsx from "clsx";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AdminPanel } from "@/components/admin-panel";
 import { ShortcutsPanel } from "@/components/shortcuts-panel";
 import { defaultImageResolutions, initialConfig } from "@/lib/config-utils";
+import { useAuthStore } from "@/lib/store/auth-store";
 import { useConfigStore } from "@/lib/store/config-store";
 import { useModelStore } from "@/lib/store/model-store";
 import { useUIStore } from "@/lib/store/ui-store";
@@ -54,6 +57,9 @@ export function SettingsModal() {
   } = useModelStore();
 
   const { theme, setTheme } = useTheme();
+
+  const { user, logout } = useAuthStore();
+  const router = useRouter();
 
   // Local state for queries handling (could be in UI store but local is fine for ephemeral search in modal)
   const [nanoModelQuery, setNanoModelQuery] = useState("");
@@ -161,6 +167,11 @@ export function SettingsModal() {
     setStatusMsg({ text: "Settings reset to defaults.", ok: true });
   }
 
+  async function handleLogout() {
+    await logout();
+    router.replace("/login");
+  }
+
   if (!showConfig) return null;
 
   return (
@@ -178,6 +189,18 @@ export function SettingsModal() {
       >
         <header className="settings-header">
           <h2 id="settings-title">Settings</h2>
+          {user && (
+            <div className="settings-user-info">
+              <span className="settings-username">{user.username}</span>
+              <button
+                type="button"
+                className="mini-btn"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </div>
+          )}
           <button
             type="button"
             className="icon-btn"
@@ -320,6 +343,34 @@ export function SettingsModal() {
               </svg>
               <span>Shortcuts</span>
             </button>
+
+            {/* Users (Admin Only) */}
+            {user?.isAdmin && (
+              <button
+                type="button"
+                className={clsx("nav-item-icon", {
+                  active: settingsTab === "users",
+                })}
+                onClick={() => setSettingsTab("users")}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>Users</span>
+              </button>
+            )}
           </aside>
           <section className="settings-main">
             {settingsTab === "settings" && (
@@ -353,6 +404,90 @@ export function SettingsModal() {
                     </div>
                   </div>
                 </div>
+
+                {/* Password Change Section */}
+                {user && (
+                  <>
+                    <div className="section-title" style={{ marginTop: "1.5rem" }}>Change Password</div>
+                    <div className="settings-row">
+                      <div className="row-label">Current</div>
+                      <div className="row-content">
+                        <input
+                          className="field"
+                          type="password"
+                          id="current-password"
+                          placeholder="Current password"
+                        />
+                      </div>
+                    </div>
+                    <div className="settings-row">
+                      <div className="row-label">New</div>
+                      <div className="row-content">
+                        <input
+                          className="field"
+                          type="password"
+                          id="new-password"
+                          placeholder="New password (min 4 chars)"
+                        />
+                      </div>
+                    </div>
+                    <div className="settings-row">
+                      <div className="row-label">Confirm</div>
+                      <div className="row-content">
+                        <input
+                          className="field"
+                          type="password"
+                          id="confirm-password"
+                          placeholder="Confirm new password"
+                        />
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={async () => {
+                            const currentPassword = (document.getElementById("current-password") as HTMLInputElement)?.value;
+                            const newPassword = (document.getElementById("new-password") as HTMLInputElement)?.value;
+                            const confirmPassword = (document.getElementById("confirm-password") as HTMLInputElement)?.value;
+
+                            if (!currentPassword || !newPassword) {
+                              setStatusMsg({ text: "Please enter current and new password", ok: false });
+                              return;
+                            }
+                            if (newPassword.length < 4) {
+                              setStatusMsg({ text: "New password must be at least 4 characters", ok: false });
+                              return;
+                            }
+                            if (newPassword !== confirmPassword) {
+                              setStatusMsg({ text: "New passwords don't match", ok: false });
+                              return;
+                            }
+
+                            try {
+                              const res = await fetch("/api/auth/change-password", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ currentPassword, newPassword }),
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                setStatusMsg({ text: "Password changed successfully!", ok: true });
+                                // Clear the fields
+                                (document.getElementById("current-password") as HTMLInputElement).value = "";
+                                (document.getElementById("new-password") as HTMLInputElement).value = "";
+                                (document.getElementById("confirm-password") as HTMLInputElement).value = "";
+                              } else {
+                                setStatusMsg({ text: data.error || "Failed to change password", ok: false });
+                              }
+                            } catch (err) {
+                              setStatusMsg({ text: "Failed to change password", ok: false });
+                            }
+                          }}
+                        >
+                          Change Password
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="settings-actions">
                   {statusMsg && (
@@ -453,55 +588,55 @@ export function SettingsModal() {
 
                 {(config.provider === "openrouter" ||
                   config.provider === "nanogpt") && (
-                  <div className="settings-row">
-                    <div className="row-label">API Key</div>
-                    <div className="row-content">
-                      <input
-                        className="field"
-                        type="password"
-                        id="api-key-connection"
-                        value={providerApiKey || ""}
-                        onChange={(e) =>
-                          setConfig((prev: UiConfig) => {
-                            const val = e.target.value;
-                            if (prev.provider === "openrouter")
-                              return { ...prev, apiKeyOpenrouter: val };
-                            if (prev.provider === "nanogpt")
-                              return { ...prev, apiKeyNanogpt: val };
-                            return prev;
-                          })
-                        }
-                        placeholder={
-                          config.provider === "openrouter"
-                            ? serverDefaults.hasApiKey && !providerApiKey
-                              ? "Using server default"
-                              : ""
-                            : config.provider === "nanogpt" &&
+                    <div className="settings-row">
+                      <div className="row-label">API Key</div>
+                      <div className="row-content">
+                        <input
+                          className="field"
+                          type="password"
+                          id="api-key-connection"
+                          value={providerApiKey || ""}
+                          onChange={(e) =>
+                            setConfig((prev: UiConfig) => {
+                              const val = e.target.value;
+                              if (prev.provider === "openrouter")
+                                return { ...prev, apiKeyOpenrouter: val };
+                              if (prev.provider === "nanogpt")
+                                return { ...prev, apiKeyNanogpt: val };
+                              return prev;
+                            })
+                          }
+                          placeholder={
+                            config.provider === "openrouter"
+                              ? serverDefaults.hasApiKey && !providerApiKey
+                                ? "Using server default"
+                                : ""
+                              : config.provider === "nanogpt" &&
                                 serverDefaults.hasNanoApiKey &&
                                 !providerApiKey
-                              ? "Using server default"
-                              : ""
-                        }
-                      />
-                      <div className="row-helpers">
-                        <button
-                          type="button"
-                          className="mini-btn"
-                          onClick={() => {
-                            const el = document.getElementById(
-                              "api-key-connection",
-                            ) as HTMLInputElement;
-                            if (el)
-                              el.type =
-                                el.type === "password" ? "text" : "password";
-                          }}
-                        >
-                          Show
-                        </button>
+                                ? "Using server default"
+                                : ""
+                          }
+                        />
+                        <div className="row-helpers">
+                          <button
+                            type="button"
+                            className="mini-btn"
+                            onClick={() => {
+                              const el = document.getElementById(
+                                "api-key-connection",
+                              ) as HTMLInputElement;
+                              if (el)
+                                el.type =
+                                  el.type === "password" ? "text" : "password";
+                            }}
+                          >
+                            Show
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 <div className="settings-actions">
                   {statusMsg && (
@@ -967,6 +1102,16 @@ export function SettingsModal() {
                 recordingKey={recordingKey}
                 setRecordingKey={setRecordingKey}
               />
+            )}
+
+            {settingsTab === "users" && user?.isAdmin && (
+              <div className="section">
+                <div className="section-title">User Management</div>
+                <p className="section-desc">
+                  Create and manage user accounts. Only administrators can access this section.
+                </p>
+                <AdminPanel />
+              </div>
             )}
           </section>
         </div>

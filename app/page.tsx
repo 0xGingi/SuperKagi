@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment } from "@/components/attachment-list";
 import { ChatComposer } from "@/components/chat-composer";
@@ -27,6 +28,7 @@ import {
   useKeyboardShortcuts,
 } from "@/lib/keyboard-shortcuts";
 import { estimateImageCost } from "@/lib/model-utils";
+import { useAuthStore } from "@/lib/store/auth-store";
 import { useChatStore } from "@/lib/store/chat-store";
 import { useConfigStore } from "@/lib/store/config-store";
 import { useModelStore } from "@/lib/store/model-store";
@@ -53,6 +55,23 @@ function _formatCost(cost?: number | null) {
 }
 
 export default function Page() {
+  const router = useRouter();
+  const { user, loading: authLoading, initialized: authInitialized, checkSession } = useAuthStore();
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (!authInitialized) {
+      checkSession();
+    }
+  }, [authInitialized, checkSession]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (authInitialized && !authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authInitialized, authLoading, user, router]);
+
   const {
     config,
     setConfig,
@@ -137,6 +156,14 @@ export default function Page() {
       .then((data) => {
         setServerDefaults(data);
         setConfig((prev) => mergeEnvDefaults(prev, prev, data));
+
+        // Auto-load NanoGPT models if provider is nanogpt and we have API access
+        if (data.provider === "nanogpt" && data.hasNanoApiKey) {
+          const { fetchNanoModels, nanoModels, nanoModelsLoading } = useModelStore.getState();
+          if (nanoModels.length === 0 && !nanoModelsLoading) {
+            fetchNanoModels();
+          }
+        }
       })
       .catch(() => undefined);
 
@@ -174,7 +201,7 @@ export default function Page() {
             );
           }
         }
-      } catch {}
+      } catch { }
 
       try {
         const chatRes = await fetch("/api/persistence/chats", {
@@ -184,17 +211,14 @@ export default function Page() {
           const data = await chatRes.json();
           if (Array.isArray(data?.chats)) {
             const mapped = chatsArrayToMap(data.chats);
-            if (Object.keys(mapped).length) {
-              setChats((prev) => ({ ...mapped, ...prev }));
-              const firstId =
-                localStorage.getItem("currentChatId") ||
-                Object.keys(mapped)[0] ||
-                "";
-              if (firstId) setCurrentChatId(firstId);
-            }
+            // Replace localStorage chats with server chats (user-specific data)
+            setChats(mapped);
+            const firstId =
+              Object.keys(mapped)[0] || "";
+            if (firstId) setCurrentChatId(firstId);
           }
         }
-      } catch {}
+      } catch { }
       setPersistLoaded(true);
     })();
   }, [
@@ -210,7 +234,7 @@ export default function Page() {
     if (!hydrated) return;
     try {
       localStorage.setItem("showReasoning", String(showReasoning));
-    } catch {}
+    } catch { }
   }, [hydrated, showReasoning]);
 
   useEffect(() => {
@@ -251,7 +275,7 @@ export default function Page() {
       setCurrentChatId(nextId);
       try {
         localStorage.setItem("currentChatId", nextId);
-      } catch {}
+      } catch { }
       if (!chats[nextId]) setChats((prev) => ({ ...prev, [nextId]: [] }));
       return;
     }
@@ -261,13 +285,13 @@ export default function Page() {
     setChats((prev) => ({ ...prev, [id]: [] }));
     try {
       localStorage.setItem("currentChatId", id);
-    } catch {}
+    } catch { }
   }, [currentChatId, chats, hydrated, setCurrentChatId, setChats]);
 
   useEffect(() => {
     try {
       localStorage.setItem("config", JSON.stringify(config));
-    } catch {}
+    } catch { }
   }, [config]);
 
   useEffect(() => {
@@ -285,7 +309,7 @@ export default function Page() {
   useEffect(() => {
     try {
       localStorage.setItem("chats", JSON.stringify(chats));
-    } catch {}
+    } catch { }
   }, [chats]);
 
   useEffect(() => {
@@ -467,7 +491,7 @@ export default function Page() {
       const next = !prev;
       try {
         localStorage.setItem("sidebarCollapsed", String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   }
@@ -746,7 +770,7 @@ export default function Page() {
               hasContent = hasContent || !!data.content.length;
               update(false);
             }
-          } catch {}
+          } catch { }
         }
         if (finished) break;
       }
@@ -922,9 +946,9 @@ export default function Page() {
         ? msg.content
         : Array.isArray(msg.content)
           ? msg.content
-              .filter((part) => part.type === "text")
-              .map((part) => part.text || "")
-              .join("\n")
+            .filter((part) => part.type === "text")
+            .map((part) => part.text || "")
+            .join("\n")
           : "";
     if (!text) return null;
     const match = text.match(/\[image\]\s*(?:generate|edit):\s*(.+)/i);
@@ -1033,10 +1057,10 @@ export default function Page() {
         typeof data.cost === "number"
           ? data.cost
           : estimateImageCost(
-              useModelStore.getState().nanoImageModels,
-              config.imageModel,
-              config.imageSize,
-            );
+            useModelStore.getState().nanoImageModels,
+            config.imageModel,
+            config.imageSize,
+          );
       if (typeof cost === "number") {
         imageContent.push({
           type: "text",
@@ -1222,10 +1246,10 @@ export default function Page() {
         typeof data.cost === "number"
           ? data.cost
           : estimateImageCost(
-              useModelStore.getState().nanoImageModels,
-              config.imageModel,
-              config.imageSize,
-            );
+            useModelStore.getState().nanoImageModels,
+            config.imageModel,
+            config.imageSize,
+          );
       if (typeof cost === "number") {
         imageContent.push({
           type: "text",
