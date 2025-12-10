@@ -108,7 +108,9 @@ export default function PricingPage() {
                     <td>{formatDate(row.createdAt)}</td>
                     <td className="mono">{row.provider}</td>
                     <td className="mono">
-                      {(row.metadata as any)?.type === "image" ? "image" : "chat"}
+                      {(row.metadata as any)?.type === "image"
+                        ? "image"
+                        : "chat"}
                     </td>
                     <td className="mono">{row.model}</td>
                     <td>{row.promptTokens ?? 0}</td>

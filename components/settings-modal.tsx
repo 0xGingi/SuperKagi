@@ -24,8 +24,6 @@ export function SettingsModal() {
     setEditingShortcut,
     recordingKey,
     setRecordingKey,
-    imageSettingsExpanded,
-    setImageSettingsExpanded,
   } = useUIStore();
 
   const { config, setConfig, serverDefaults } = useConfigStore();
@@ -45,7 +43,6 @@ export function SettingsModal() {
     openrouterModelsLoading,
     openrouterModelsFetchedAt,
     fetchOpenrouterModels,
-    setOpenrouterModels,
 
     nanoImageModels,
     nanoImageModelsStatus,
@@ -94,7 +91,7 @@ export function SettingsModal() {
     (m) => m.id === (config.imageModel || ""),
   );
 
-  const imageResolutionOptions = activeImageModel?.resolutions?.length
+  const _imageResolutionOptions = activeImageModel?.resolutions?.length
     ? activeImageModel.resolutions
     : defaultImageResolutions;
 
@@ -212,7 +209,16 @@ export function SettingsModal() {
               })}
               onClick={() => setSettingsTab("settings")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -227,7 +233,16 @@ export function SettingsModal() {
               })}
               onClick={() => setSettingsTab("connection")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
@@ -242,7 +257,16 @@ export function SettingsModal() {
               })}
               onClick={() => setSettingsTab("textModels")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               <span>Text Models</span>
@@ -256,7 +280,16 @@ export function SettingsModal() {
               })}
               onClick={() => setSettingsTab("imageModels")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21,15 16,10 5,21" />
@@ -272,7 +305,16 @@ export function SettingsModal() {
               })}
               onClick={() => setSettingsTab("shortcuts")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
                 <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8" />
               </svg>
@@ -344,14 +386,16 @@ export function SettingsModal() {
                     Done
                   </button>
                 </div>
-              </div >
+              </div>
             )}
 
             {/* Connection Tab */}
             {settingsTab === "connection" && (
               <div className="section">
                 <div className="section-title">Provider</div>
-                <p className="section-desc">Select your AI provider and configure API credentials.</p>
+                <p className="section-desc">
+                  Select your AI provider and configure API credentials.
+                </p>
 
                 <div className="settings-row">
                   <div className="row-label">Provider</div>
@@ -407,7 +451,8 @@ export function SettingsModal() {
                   </div>
                 )}
 
-                {(config.provider === "openrouter" || config.provider === "nanogpt") && (
+                {(config.provider === "openrouter" ||
+                  config.provider === "nanogpt") && (
                   <div className="settings-row">
                     <div className="row-label">API Key</div>
                     <div className="row-content">
@@ -432,8 +477,8 @@ export function SettingsModal() {
                               ? "Using server default"
                               : ""
                             : config.provider === "nanogpt" &&
-                              serverDefaults.hasNanoApiKey &&
-                              !providerApiKey
+                                serverDefaults.hasNanoApiKey &&
+                                !providerApiKey
                               ? "Using server default"
                               : ""
                         }
@@ -489,15 +534,25 @@ export function SettingsModal() {
             {settingsTab === "textModels" && (
               <div className="section">
                 <div className="section-title">Text Models</div>
-                <p className="section-desc">Select and configure text generation models for your current provider ({config.provider}).</p>
+                <p className="section-desc">
+                  Select and configure text generation models for your current
+                  provider ({config.provider}).
+                </p>
 
                 <div className="settings-row">
                   <div className="row-label">Model</div>
-                  <div className="row-content" style={{ flexDirection: "column", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    className="row-content"
+                    style={{ flexDirection: "column", gap: 10 }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
                       <input
                         className="field"
-                        value={config.models?.[config.provider] || config.model || ""}
+                        value={
+                          config.models?.[config.provider] || config.model || ""
+                        }
                         onChange={(e) =>
                           setConfig((prev: UiConfig) => ({
                             ...prev,
@@ -534,7 +589,9 @@ export function SettingsModal() {
                           onClick={fetchOpenrouterModels}
                           disabled={openrouterModelsLoading}
                         >
-                          {openrouterModelsLoading ? "Loading..." : "Load Models"}
+                          {openrouterModelsLoading
+                            ? "Loading..."
+                            : "Load Models"}
                         </button>
                       )}
                     </div>
@@ -544,11 +601,15 @@ export function SettingsModal() {
                       <div className="nano-models">
                         <div className="nano-status">
                           <div>
-                            {nanoModelsStatus || "Load models using your NanoGPT API key."}
+                            {nanoModelsStatus ||
+                              "Load models using your NanoGPT API key."}
                           </div>
                           {nanoModelsFetchedAt && (
                             <div className="nano-meta">
-                              Last fetched: {new Date(nanoModelsFetchedAt).toLocaleTimeString()}
+                              Last fetched:{" "}
+                              {new Date(
+                                nanoModelsFetchedAt,
+                              ).toLocaleTimeString()}
                             </div>
                           )}
                         </div>
@@ -556,14 +617,18 @@ export function SettingsModal() {
                           <div className="segmented nano-scope-toggle">
                             <button
                               type="button"
-                              className={clsx("seg", { active: nanoModelScope === "subscription" })}
+                              className={clsx("seg", {
+                                active: nanoModelScope === "subscription",
+                              })}
                               onClick={() => setNanoModelScope("subscription")}
                             >
                               Subscription
                             </button>
                             <button
                               type="button"
-                              className={clsx("seg", { active: nanoModelScope === "paid" })}
+                              className={clsx("seg", {
+                                active: nanoModelScope === "paid",
+                              })}
                               onClick={() => setNanoModelScope("paid")}
                             >
                               Paid
@@ -591,17 +656,23 @@ export function SettingsModal() {
                               key={m.id}
                               type="button"
                               className={clsx("model-pill", {
-                                active: (config.models?.nanogpt || config.model) === m.id,
+                                active:
+                                  (config.models?.nanogpt || config.model) ===
+                                  m.id,
                               })}
                               onClick={() => applyNanoModel(m.id)}
                               title={m.label}
                             >
                               <span className="label">{m.id}</span>
-                              {m.pricing && <span className="meta">{m.pricing}</span>}
+                              {m.pricing && (
+                                <span className="meta">{m.pricing}</span>
+                              )}
                             </button>
                           ))}
                           {!filteredNanoModels.length && (
-                            <div className="nano-status">No models loaded yet.</div>
+                            <div className="nano-status">
+                              No models loaded yet.
+                            </div>
                           )}
                         </div>
                       </div>
@@ -612,11 +683,15 @@ export function SettingsModal() {
                       <div className="nano-models">
                         <div className="nano-status">
                           <div>
-                            {openrouterModelsStatus || "Load models from OpenRouter."}
+                            {openrouterModelsStatus ||
+                              "Load models from OpenRouter."}
                           </div>
                           {openrouterModelsFetchedAt && (
                             <div className="nano-meta">
-                              Last fetched: {new Date(openrouterModelsFetchedAt).toLocaleTimeString()}
+                              Last fetched:{" "}
+                              {new Date(
+                                openrouterModelsFetchedAt,
+                              ).toLocaleTimeString()}
                             </div>
                           )}
                         </div>
@@ -625,7 +700,9 @@ export function SettingsModal() {
                             className="field"
                             placeholder="Filter models..."
                             value={openrouterModelQuery}
-                            onChange={(e) => setOpenrouterModelQuery(e.target.value)}
+                            onChange={(e) =>
+                              setOpenrouterModelQuery(e.target.value)
+                            }
                           />
                           {openrouterModelQuery && (
                             <button
@@ -643,17 +720,23 @@ export function SettingsModal() {
                               key={m.id}
                               type="button"
                               className={clsx("model-pill", {
-                                active: (config.models?.openrouter || config.model) === m.id,
+                                active:
+                                  (config.models?.openrouter ||
+                                    config.model) === m.id,
                               })}
                               onClick={() => applyOpenrouterModel(m.id)}
                               title={m.label}
                             >
                               <span className="label">{m.id}</span>
-                              {m.pricing && <span className="meta">{m.pricing}</span>}
+                              {m.pricing && (
+                                <span className="meta">{m.pricing}</span>
+                              )}
                             </button>
                           ))}
                           {!filteredOpenrouterModels.length && (
-                            <div className="nano-status">No models loaded yet.</div>
+                            <div className="nano-status">
+                              No models loaded yet.
+                            </div>
                           )}
                         </div>
                       </div>
@@ -663,7 +746,9 @@ export function SettingsModal() {
 
                 <div className="settings-actions">
                   {statusMsg && (
-                    <div className={clsx("status-msg", { error: !statusMsg.ok })}>
+                    <div
+                      className={clsx("status-msg", { error: !statusMsg.ok })}
+                    >
                       {statusMsg.text}
                     </div>
                   )}
@@ -682,12 +767,19 @@ export function SettingsModal() {
             {settingsTab === "imageModels" && config.provider === "nanogpt" && (
               <div className="section">
                 <div className="section-title">Image Models</div>
-                <p className="section-desc">Select and configure image generation models.</p>
+                <p className="section-desc">
+                  Select and configure image generation models.
+                </p>
 
                 <div className="settings-row">
                   <div className="row-label">Image Model</div>
-                  <div className="row-content" style={{ flexDirection: "column", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    className="row-content"
+                    style={{ flexDirection: "column", gap: 10 }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
                       <input
                         className="field"
                         value={config.imageModel || ""}
@@ -712,11 +804,15 @@ export function SettingsModal() {
                     <div className="nano-models">
                       <div className="nano-status">
                         <div>
-                          {nanoImageModelsStatus || "Load image models using your NanoGPT API key."}
+                          {nanoImageModelsStatus ||
+                            "Load image models using your NanoGPT API key."}
                         </div>
                         {nanoImageModelsFetchedAt && (
                           <div className="nano-meta">
-                            Last fetched: {new Date(nanoImageModelsFetchedAt).toLocaleTimeString()}
+                            Last fetched:{" "}
+                            {new Date(
+                              nanoImageModelsFetchedAt,
+                            ).toLocaleTimeString()}
                           </div>
                         )}
                       </div>
@@ -724,14 +820,20 @@ export function SettingsModal() {
                         <div className="segmented nano-scope-toggle">
                           <button
                             type="button"
-                            className={clsx("seg", { active: nanoImageModelScope === "subscription" })}
-                            onClick={() => setNanoImageModelScope("subscription")}
+                            className={clsx("seg", {
+                              active: nanoImageModelScope === "subscription",
+                            })}
+                            onClick={() =>
+                              setNanoImageModelScope("subscription")
+                            }
                           >
                             Subscription
                           </button>
                           <button
                             type="button"
-                            className={clsx("seg", { active: nanoImageModelScope === "paid" })}
+                            className={clsx("seg", {
+                              active: nanoImageModelScope === "paid",
+                            })}
                             onClick={() => setNanoImageModelScope("paid")}
                           >
                             Paid
@@ -741,7 +843,9 @@ export function SettingsModal() {
                           className="field"
                           placeholder="Filter image models..."
                           value={nanoImageModelQuery}
-                          onChange={(e) => setNanoImageModelQuery(e.target.value)}
+                          onChange={(e) =>
+                            setNanoImageModelQuery(e.target.value)
+                          }
                         />
                         {nanoImageModelQuery && (
                           <button
@@ -765,11 +869,15 @@ export function SettingsModal() {
                             title={m.label}
                           >
                             <span className="label">{m.id}</span>
-                            {m.pricing && <span className="meta">{m.pricing}</span>}
+                            {m.pricing && (
+                              <span className="meta">{m.pricing}</span>
+                            )}
                           </button>
                         ))}
                         {!filteredNanoImageModels.length && (
-                          <div className="nano-status">No image models loaded yet.</div>
+                          <div className="nano-status">
+                            No image models loaded yet.
+                          </div>
                         )}
                       </div>
                     </div>
@@ -790,7 +898,9 @@ export function SettingsModal() {
                       }
                     >
                       {defaultImageResolutions.map((size) => (
-                        <option key={size} value={size}>{size}</option>
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -835,36 +945,32 @@ export function SettingsModal() {
                   </div>
                 </div>
               </div>
-            )
-            }
+            )}
 
-            {
-              settingsTab === "imageModels" && config.provider !== "nanogpt" && (
-                <div className="section">
-                  <div className="section-title">Image Generation</div>
-                  <p className="section-desc" style={{ color: "var(--muted)" }}>
-                    Image generation is only available with the NanoGPT provider.
-                    Switch to NanoGPT in the Text Models tab to enable image generation.
-                  </p>
-                </div>
-              )
-            }
+            {settingsTab === "imageModels" && config.provider !== "nanogpt" && (
+              <div className="section">
+                <div className="section-title">Image Generation</div>
+                <p className="section-desc" style={{ color: "var(--muted)" }}>
+                  Image generation is only available with the NanoGPT provider.
+                  Switch to NanoGPT in the Text Models tab to enable image
+                  generation.
+                </p>
+              </div>
+            )}
 
-            {
-              settingsTab === "shortcuts" && (
-                <ShortcutsPanel
-                  customShortcuts={customShortcuts}
-                  setCustomShortcuts={setCustomShortcuts}
-                  editingShortcut={editingShortcut}
-                  setEditingShortcut={setEditingShortcut}
-                  recordingKey={recordingKey}
-                  setRecordingKey={setRecordingKey}
-                />
-              )
-            }
-          </section >
-        </div >
-      </div >
-    </div >
+            {settingsTab === "shortcuts" && (
+              <ShortcutsPanel
+                customShortcuts={customShortcuts}
+                setCustomShortcuts={setCustomShortcuts}
+                editingShortcut={editingShortcut}
+                setEditingShortcut={setEditingShortcut}
+                recordingKey={recordingKey}
+                setRecordingKey={setRecordingKey}
+              />
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }

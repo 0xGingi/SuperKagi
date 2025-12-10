@@ -39,10 +39,10 @@ export function ChatComposer({
   removeAttachment,
   inputRef,
   visible = true,
-  currentModel,
-  onOpenConfig,
+  currentModel: _currentModel,
+  onOpenConfig: _onOpenConfig,
 }: Props) {
-  const displayModel = currentModel?.split("/").pop() || "Model";
+  const _displayModel = _currentModel?.split("/").pop() || "Model";
 
   return (
     <footer className="composer" style={{ display: visible ? "flex" : "none" }}>
@@ -78,8 +78,22 @@ export function ChatComposer({
           onKeyDown={(e) => e.key === "Enter" && onSend()}
         />
 
-        <button type="button" className="voice-btn" onClick={onSend} title="Send message">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <button
+          type="button"
+          className="voice-btn"
+          onClick={onSend}
+          title="Send message"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <line x1="22" y1="2" x2="11" y2="13" />
             <polygon points="22,2 15,22 11,13 2,9" />
           </svg>
@@ -92,7 +106,14 @@ export function ChatComposer({
           className={clsx("chip", "toggle", { active: deepOn })}
           onClick={toggleDeepSearch}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
@@ -107,7 +128,14 @@ export function ChatComposer({
             disabled={isGeneratingImage}
             title="Generate Image"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21,15 16,10 5,21" />
@@ -124,4 +152,3 @@ export function ChatComposer({
     </footer>
   );
 }
-

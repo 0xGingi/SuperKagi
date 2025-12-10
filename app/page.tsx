@@ -174,7 +174,7 @@ export default function Page() {
             );
           }
         }
-      } catch { }
+      } catch {}
 
       try {
         const chatRes = await fetch("/api/persistence/chats", {
@@ -194,7 +194,7 @@ export default function Page() {
             }
           }
         }
-      } catch { }
+      } catch {}
       setPersistLoaded(true);
     })();
   }, [
@@ -210,7 +210,7 @@ export default function Page() {
     if (!hydrated) return;
     try {
       localStorage.setItem("showReasoning", String(showReasoning));
-    } catch { }
+    } catch {}
   }, [hydrated, showReasoning]);
 
   useEffect(() => {
@@ -251,7 +251,7 @@ export default function Page() {
       setCurrentChatId(nextId);
       try {
         localStorage.setItem("currentChatId", nextId);
-      } catch { }
+      } catch {}
       if (!chats[nextId]) setChats((prev) => ({ ...prev, [nextId]: [] }));
       return;
     }
@@ -261,13 +261,13 @@ export default function Page() {
     setChats((prev) => ({ ...prev, [id]: [] }));
     try {
       localStorage.setItem("currentChatId", id);
-    } catch { }
+    } catch {}
   }, [currentChatId, chats, hydrated, setCurrentChatId, setChats]);
 
   useEffect(() => {
     try {
       localStorage.setItem("config", JSON.stringify(config));
-    } catch { }
+    } catch {}
   }, [config]);
 
   useEffect(() => {
@@ -285,7 +285,7 @@ export default function Page() {
   useEffect(() => {
     try {
       localStorage.setItem("chats", JSON.stringify(chats));
-    } catch { }
+    } catch {}
   }, [chats]);
 
   useEffect(() => {
@@ -467,7 +467,7 @@ export default function Page() {
       const next = !prev;
       try {
         localStorage.setItem("sidebarCollapsed", String(next));
-      } catch { }
+      } catch {}
       return next;
     });
   }
@@ -746,7 +746,7 @@ export default function Page() {
               hasContent = hasContent || !!data.content.length;
               update(false);
             }
-          } catch { }
+          } catch {}
         }
         if (finished) break;
       }
@@ -922,9 +922,9 @@ export default function Page() {
         ? msg.content
         : Array.isArray(msg.content)
           ? msg.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text || "")
-            .join("\n")
+              .filter((part) => part.type === "text")
+              .map((part) => part.text || "")
+              .join("\n")
           : "";
     if (!text) return null;
     const match = text.match(/\[image\]\s*(?:generate|edit):\s*(.+)/i);
@@ -1033,10 +1033,10 @@ export default function Page() {
         typeof data.cost === "number"
           ? data.cost
           : estimateImageCost(
-            useModelStore.getState().nanoImageModels,
-            config.imageModel,
-            config.imageSize,
-          );
+              useModelStore.getState().nanoImageModels,
+              config.imageModel,
+              config.imageSize,
+            );
       if (typeof cost === "number") {
         imageContent.push({
           type: "text",
@@ -1222,10 +1222,10 @@ export default function Page() {
         typeof data.cost === "number"
           ? data.cost
           : estimateImageCost(
-            useModelStore.getState().nanoImageModels,
-            config.imageModel,
-            config.imageSize,
-          );
+              useModelStore.getState().nanoImageModels,
+              config.imageModel,
+              config.imageSize,
+            );
       if (typeof cost === "number") {
         imageContent.push({
           type: "text",

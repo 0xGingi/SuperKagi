@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -12,17 +12,23 @@ interface MarkdownRendererProps {
 }
 
 // Code block component with copy functionality
-function CodeBlock({ language, children }: { language: string; children: React.ReactNode }) {
+function CodeBlock({
+  language,
+  children,
+}: {
+  language: string;
+  children: React.ReactNode;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    const text = String(children).replace(/\n$/, '');
+    const text = String(children).replace(/\n$/, "");
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error("Failed to copy:", err);
     }
   }, [children]);
 
@@ -39,14 +45,28 @@ function CodeBlock({ language, children }: { language: string; children: React.R
           >
             {copied ? (
               <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
                 Copied
               </>
             ) : (
               <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                 </svg>
@@ -57,9 +77,7 @@ function CodeBlock({ language, children }: { language: string; children: React.R
         </div>
       </div>
       <pre className={`hljs language-${language}`}>
-        <code className={`language-${language}`}>
-          {children}
-        </code>
+        <code className={`language-${language}`}>{children}</code>
       </pre>
     </div>
   );

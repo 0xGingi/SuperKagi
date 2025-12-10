@@ -180,16 +180,21 @@ export function ChatThread({
       {thread.length ? (
         <div className="thread-toolbar">
           <div className="thread-info">
-            <span className="thread-meta">
-              {totalCount} messages
-            </span>
+            <span className="thread-meta">{totalCount} messages</span>
             <button
               type="button"
               className={clsx("chip", "toggle", { active: showReasoning })}
               onClick={onToggleReasoning}
               aria-pressed={showReasoning}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
@@ -213,7 +218,7 @@ export function ChatThread({
         const errorText =
           msg.error ||
           (typeof msg.content === "string" &&
-            msg.content.toLowerCase().startsWith("error:")
+          msg.content.toLowerCase().startsWith("error:")
             ? msg.content
             : "");
 

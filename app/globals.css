@@ -1447,7 +1447,6 @@ a {
   }
 }
 
-
 .w-full {
   width: 100%;
 }
@@ -1980,7 +1979,7 @@ a {
 }
 
 .mono {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 12px;
   color: #888;
 }
@@ -2389,4 +2388,760 @@ a {
 .sidebar-collapse-btn svg {
   width: 18px;
   height: 18px;
+}
+
+/* ============================================
+   Imagine Page Dashboard Styles
+   ============================================ */
+.imagine-page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100vw;
+  background: var(--bg);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.imagine-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.imagine-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.imagine-header h1 svg {
+  color: var(--accent);
+}
+
+.imagine-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.imagine-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-muted);
+  color: var(--text);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.imagine-back-btn:hover {
+  background: var(--accent-hover);
+  transform: translateX(-2px);
+}
+
+.imagine-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.imagine-header-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.imagine-header-stats span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Dashboard Layout */
+.imagine-dashboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Left Panel - Controls */
+.imagine-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+/* Right Panel - Gallery Canvas */
+.imagine-right-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+/* Prompt Card */
+.imagine-prompt-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(127, 96, 249, 0.08) 0%, rgba(109, 220, 255, 0.08) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.imagine-prompt-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #7f60f9 0%, #6ddcff 100%);
+}
+
+.imagine-prompt-card:focus-within {
+  border-color: rgba(127, 96, 249, 0.4);
+  box-shadow: 0 0 0 3px rgba(127, 96, 249, 0.1);
+}
+
+.imagine-prompt-card.drag-over {
+  border-color: rgba(109, 220, 255, 0.6);
+  background: rgba(109, 220, 255, 0.1);
+}
+
+.imagine-prompt-inner {
+  padding: 16px;
+}
+
+.imagine-source-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.imagine-source-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-source-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.remove-source-btn:hover {
+  background: rgba(255, 80, 80, 0.8);
+}
+
+.imagine-prompt-input {
+  width: 100%;
+  min-height: 100px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  font-family: inherit;
+}
+
+.imagine-prompt-input::placeholder {
+  color: var(--muted);
+}
+
+.imagine-prompt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--border);
+}
+
+.imagine-prompt-hint {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.imagine-prompt-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.imagine-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imagine-generate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #7f60f9 0%, #6ddcff 100%);
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.imagine-generate-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(125, 98, 255, 0.4);
+}
+
+.imagine-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.imagine-generate-btn .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.imagine-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(139, 28, 28, 0.15);
+  border: 1px solid rgba(255, 100, 100, 0.25);
+  border-radius: var(--radius-sm);
+  color: #ff8888;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.imagine-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Settings Cards */
+.imagine-settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.imagine-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.imagine-settings-header:hover {
+  background: var(--accent-muted);
+}
+
+.imagine-settings-header svg {
+  transition: transform var(--transition-fast);
+}
+
+.imagine-settings-body {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.imagine-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.imagine-setting label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.imagine-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imagine-setting-row .field {
+  flex: 1;
+}
+
+.imagine-setting-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.imagine-setting input[type="range"] {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.imagine-setting input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.imagine-setting input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* Gallery Canvas */
+.imagine-gallery-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.imagine-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.imagine-gallery-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imagine-gallery-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--accent-muted);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Empty State */
+.imagine-gallery-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  background: linear-gradient(135deg, rgba(127, 96, 249, 0.03) 0%, rgba(109, 220, 255, 0.03) 100%);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.imagine-empty-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  color: var(--muted);
+  opacity: 0.4;
+}
+
+.imagine-gallery-empty h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.imagine-gallery-empty p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 300px;
+}
+
+.imagine-prompt-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.imagine-prompt-suggestion {
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.imagine-prompt-suggestion:hover {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Gallery Grid */
+.imagine-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  flex: 1;
+  align-content: start;
+}
+
+.imagine-gallery-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
+}
+
+.imagine-gallery-item:hover {
+  transform: scale(1.03);
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px rgba(127, 96, 249, 0.2);
+}
+
+.imagine-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.imagine-gallery-item:hover img {
+  transform: scale(1.08);
+}
+
+.imagine-gallery-item-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.imagine-gallery-item:hover .imagine-gallery-item-overlay {
+  opacity: 1;
+}
+
+.imagine-gallery-item-overlay p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.imagine-gallery-item-model {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Preview Modal */
+.imagine-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(12px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.imagine-preview-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  gap: 24px;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.imagine-preview-close {
+  position: absolute;
+  top: -48px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.imagine-preview-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.imagine-preview-image {
+  max-width: 60vw;
+  max-height: 80vh;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.imagine-preview-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.imagine-preview-info {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 280px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.imagine-preview-prompt {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.imagine-preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.imagine-preview-meta span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.imagine-preview-meta strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.imagine-preview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.imagine-preview-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.imagine-preview-actions .btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .imagine-dashboard {
+    grid-template-columns: 340px 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .imagine-dashboard {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .imagine-left-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    max-height: 45vh;
+    overflow-y: auto;
+  }
+
+  .imagine-right-panel {
+    padding: 16px;
+  }
+
+  .imagine-header-stats {
+    display: none;
+  }
+
+  .imagine-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .imagine-preview-content {
+    flex-direction: column;
+    max-width: 95vw;
+    padding: 16px;
+  }
+
+  .imagine-preview-image {
+    max-width: 100%;
+    max-height: 50vh;
+  }
+
+  .imagine-preview-info {
+    min-width: unset;
+    max-width: unset;
+  }
+
+  .imagine-preview-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .imagine-preview-actions .btn {
+    flex: 1;
+    min-width: 100px;
+  }
 }
